@@ -5,15 +5,10 @@ jobs:
       - image: circleci/golang:1.12
 
     steps:
-      - restore_cache:
-          keys:
-            - go-mod-v1-{{ checksum "go.sum" }}
+      - run: go get github.com/mattn/goveralls
 
       - checkout
 
-      - run: go test -v .
+      - run: go test -v -covermode=count -coverprofile=/tmp/coverage.out .
 
-      - save_cache:
-          key: go-mod-v1-{{ checksum "go.sum" }}
-          paths:
-            - "/go/pkg/mod"
+      - run: /go/bin/goveralls -coverprofile=/tmp/coverage.out -service circle-ci -repotoken $COVERALLS_TOKEN
