@@ -1,4 +1,4 @@
-Immutable ![license](https://img.shields.io/github/license/benbjohnson/immutable.svg?style=flat-square) ![release](https://img.shields.io/github/release/benbjohnson/immutable.svg?style=flat-square)
+Immutable ![release](https://img.shields.io/github/release/benbjohnson/immutable.svg?style=flat-square) ![CircleCI](https://img.shields.io/circleci/project/github/benbjohnson/immutable/master.svg?style=flat-square) ![license](https://img.shields.io/github/license/benbjohnson/immutable.svg?style=flat-square)
 =========
 
 This repository contains immutable collection types for Go. It includes
