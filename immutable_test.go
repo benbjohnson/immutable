@@ -483,7 +483,7 @@ func ExampleList_Iterator_reverse() {
 }
 
 // Ensure node can support overwrites as it expands.
-func TestIngernal_mapNode_Overwrite(t *testing.T) {
+func TestInternal_mapNode_Overwrite(t *testing.T) {
 	const n = 1000
 	var h intHasher
 	var node mapNode = &mapArrayNode{}
@@ -517,7 +517,7 @@ func TestIngernal_mapNode_Overwrite(t *testing.T) {
 	}
 }
 
-func TestIngernal_mapArrayNode(t *testing.T) {
+func TestInternal_mapArrayNode(t *testing.T) {
 	// Ensure 8 or fewer elements stays in an array node.
 	t.Run("Append", func(t *testing.T) {
 		var h intHasher
@@ -593,7 +593,7 @@ func TestIngernal_mapArrayNode(t *testing.T) {
 	})
 }
 
-func TestIngernal_mapValueNode(t *testing.T) {
+func TestInternal_mapValueNode(t *testing.T) {
 	t.Run("Simple", func(t *testing.T) {
 		var h intHasher
 		n := newMapValueNode(h.Hash(2), 2, 3)
@@ -1131,10 +1131,7 @@ func (m *TestMap) Validate() error {
 			return fmt.Errorf("key (%d) mismatch: immutable=%d, std=%d", k, v, m.std[k])
 		}
 	}
-	if err := m.validateIterator(); err != nil {
-		return err
-	}
-	return nil
+	return m.validateIterator()
 }
 
 func (m *TestMap) validateIterator() error {
@@ -1260,7 +1257,7 @@ func ExampleMap_Iterator() {
 	// apple 100
 }
 
-func TestIngernalSortedMapLeafNode(t *testing.T) {
+func TestInternalSortedMapLeafNode(t *testing.T) {
 	RunRandom(t, "NoSplit", func(t *testing.T, rand *rand.Rand) {
 		var cmpr intComparer
 		var node sortedMapNode = &sortedMapLeafNode{}
@@ -1360,7 +1357,7 @@ func TestIngernalSortedMapLeafNode(t *testing.T) {
 	})
 }
 
-func TestIngernalSortedMapBranchNode(t *testing.T) {
+func TestInternalSortedMapBranchNode(t *testing.T) {
 	RunRandom(t, "NoSplit", func(t *testing.T, rand *rand.Rand) {
 		keys := make([]int, 32*16)
 		for i := range keys {

@@ -49,7 +49,7 @@ import (
 	"strings"
 )
 
-// Lists are dense, ordered, indexed collections. They are analogous to slices
+// List is a dense, ordered, indexed collections. They are analogous to slices
 // in Go. They can be updated by appending to the end of the list, prepending
 // values to the beginning of the list, or updating existing indexes in the
 // list.
@@ -1158,6 +1158,12 @@ func (itr *MapIterator) Next() (key, value interface{}) {
 
 	// Move up stack until we find a node that has remaining position ahead
 	// and move that element forward by one.
+	itr.next()
+	return key, value
+}
+
+// next moves to the next available key.
+func (itr *MapIterator) next() {
 	for ; itr.depth >= 0; itr.depth-- {
 		elem := &itr.stack[itr.depth]
 
@@ -1165,7 +1171,7 @@ func (itr *MapIterator) Next() (key, value interface{}) {
 		case *mapArrayNode:
 			if elem.index < len(node.entries)-1 {
 				elem.index++
-				return key, value
+				return
 			}
 
 		case *mapBitmapIndexedNode:
@@ -1174,7 +1180,7 @@ func (itr *MapIterator) Next() (key, value interface{}) {
 				itr.stack[itr.depth+1].node = node.nodes[elem.index]
 				itr.depth++
 				itr.first()
-				return key, value
+				return
 			}
 
 		case *mapHashArrayNode:
@@ -1184,7 +1190,7 @@ func (itr *MapIterator) Next() (key, value interface{}) {
 					itr.stack[itr.depth+1].node = node.nodes[elem.index]
 					itr.depth++
 					itr.first()
-					return key, value
+					return
 				}
 			}
 
@@ -1194,13 +1200,10 @@ func (itr *MapIterator) Next() (key, value interface{}) {
 		case *mapHashCollisionNode:
 			if elem.index < len(node.entries)-1 {
 				elem.index++
-				return key, value
+				return
 			}
 		}
 	}
-
-	// This only occurs if depth is -1.
-	return key, value
 }
 
 // first positions the stack left most index.
