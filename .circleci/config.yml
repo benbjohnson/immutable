@@ -5,10 +5,9 @@ jobs:
       - image: circleci/golang:1.12
 
     steps:
-      - run: go get github.com/mattn/goveralls
-
       - checkout
 
-      - run: go test -v -covermode=count -coverprofile=/tmp/coverage.out .
+      - run: go test -v -covermode=atomic -coverprofile=coverage.txt .
 
-      - run: /go/bin/goveralls -coverprofile=/tmp/coverage.out -service circle-ci -repotoken $COVERALLS_TOKEN
+      - run: bash <(curl -s https://codecov.io/bash)
+
