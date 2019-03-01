@@ -197,10 +197,6 @@ func TestList(t *testing.T) {
 			default: // append
 				l.Append(rand.Intn(10000))
 			}
-
-			if err := l.Validate(); err != nil {
-				t.Fatal(err)
-			}
 		}
 		if err := l.Validate(); err != nil {
 			t.Fatal(err)
@@ -900,7 +896,7 @@ func TestMap_Set(t *testing.T) {
 
 	RunRandom(t, "Random", func(t *testing.T, rand *rand.Rand) {
 		m := NewTestMap()
-		for i := 0; i < 100000; i++ {
+		for i := 0; i < 10000; i++ {
 			switch rand.Intn(2) {
 			case 1: // overwrite
 				m.Set(m.ExistingKey(rand), rand.Intn(10000))
@@ -986,7 +982,7 @@ func TestMap_Delete(t *testing.T) {
 
 	RunRandom(t, "Random", func(t *testing.T, rand *rand.Rand) {
 		m := NewTestMap()
-		for i := 0; i < 100000; i++ {
+		for i := 0; i < 10000; i++ {
 			switch rand.Intn(8) {
 			case 0: // overwrite
 				m.Set(m.ExistingKey(rand), rand.Intn(10000))
