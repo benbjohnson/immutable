@@ -1686,6 +1686,32 @@ func TestSortedMap_Delete(t *testing.T) {
 }
 
 func TestSortedMap_Iterator(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		t.Run("First", func(t *testing.T) {
+			itr := NewSortedMap(nil).Iterator()
+			itr.First()
+			if k, v := itr.Next(); k != nil || v != nil {
+				t.Fatalf("SortedMapIterator.Next()=<%v,%v>, expected nil", k, v)
+			}
+		})
+
+		t.Run("Last", func(t *testing.T) {
+			itr := NewSortedMap(nil).Iterator()
+			itr.Last()
+			if k, v := itr.Prev(); k != nil || v != nil {
+				t.Fatalf("SortedMapIterator.Prev()=<%v,%v>, expected nil", k, v)
+			}
+		})
+
+		t.Run("Seek", func(t *testing.T) {
+			itr := NewSortedMap(nil).Iterator()
+			itr.Seek("foo")
+			if k, v := itr.Next(); k != nil || v != nil {
+				t.Fatalf("SortedMapIterator.Next()=<%v,%v>, expected nil", k, v)
+			}
+		})
+	})
+
 	t.Run("Seek", func(t *testing.T) {
 		const n = 100
 		m := NewSortedMap(nil)
