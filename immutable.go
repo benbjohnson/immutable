@@ -1585,31 +1585,37 @@ func (itr *SortedMapIterator) Done() bool {
 
 // First moves the iterator to the first key/value pair.
 func (itr *SortedMapIterator) First() {
-	if itr.m.root != nil {
-		itr.stack[0] = sortedMapIteratorElem{node: itr.m.root}
-		itr.depth = 0
-		itr.first()
+	if itr.m.root == nil {
+		itr.depth = -1
+		return
 	}
+	itr.stack[0] = sortedMapIteratorElem{node: itr.m.root}
+	itr.depth = 0
+	itr.first()
 }
 
 // Last moves the iterator to the last key/value pair.
 func (itr *SortedMapIterator) Last() {
-	if itr.m.root != nil {
-		itr.stack[0] = sortedMapIteratorElem{node: itr.m.root}
-		itr.depth = 0
-		itr.last()
+	if itr.m.root == nil {
+		itr.depth = -1
+		return
 	}
+	itr.stack[0] = sortedMapIteratorElem{node: itr.m.root}
+	itr.depth = 0
+	itr.last()
 }
 
 // Seek moves the iterator position to the given key in the map.
 // If the key does not exist then the next key is used. If no more keys exist
 // then the iteartor is marked as done.
 func (itr *SortedMapIterator) Seek(key interface{}) {
-	if itr.m.root != nil {
-		itr.stack[0] = sortedMapIteratorElem{node: itr.m.root}
-		itr.depth = 0
-		itr.seek(key)
+	if itr.m.root == nil {
+		itr.depth = -1
+		return
 	}
+	itr.stack[0] = sortedMapIteratorElem{node: itr.m.root}
+	itr.depth = 0
+	itr.seek(key)
 }
 
 // Next returns the current key/value pair and moves the iterator forward.
