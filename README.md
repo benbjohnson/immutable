@@ -107,6 +107,27 @@ By default iterators start from index zero, however, the `Seek()` method can be
 used to jump to a given index.
 
 
+### Efficiently building lists
+
+If you are building large lists, it is significantly more efficient to use the
+`ListBuilder`. It uses nearly the same API as `List` except that it updates
+a list in-place until you are ready to use it. This can improve bulk list
+building by 10x or more.
+
+```go
+b := immutable.NewListBuilder(immutable.NewList())
+b.Append("foo")
+b.Append("bar")
+b.Set(2, "baz")
+
+l := b.List()
+fmt.Println(l.Get(0)) // "foo"
+fmt.Println(l.Get(1)) // "baz"
+```
+
+Lists are safe to use even after you continue to use the builder. It is also
+safe to build on top of existing lists.
+
 
 ## Map
 

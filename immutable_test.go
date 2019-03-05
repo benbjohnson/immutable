@@ -207,13 +207,15 @@ func TestList(t *testing.T) {
 // TList represents a list that operates on a standard Go slice & immutable list.
 type TList struct {
 	im, prev *List
+	builder  *ListBuilder
 	std      []int
 }
 
 // NewTList returns a new instance of TList.
 func NewTList() *TList {
 	return &TList{
-		im: NewList(),
+		im:      NewList(),
+		builder: NewListBuilder(NewList()),
 	}
 }
 
@@ -244,6 +246,7 @@ func (l *TList) ChooseSliceIndices(rand *rand.Rand) (start, end int) {
 func (l *TList) Append(v int) {
 	l.prev = l.im
 	l.im = l.im.Append(v)
+	l.builder.Append(v)
 	l.std = append(l.std, v)
 }
 
@@ -251,6 +254,7 @@ func (l *TList) Append(v int) {
 func (l *TList) Prepend(v int) {
 	l.prev = l.im
 	l.im = l.im.Prepend(v)
+	l.builder.Prepend(v)
 	l.std = append([]int{v}, l.std...)
 }
 
@@ -258,6 +262,7 @@ func (l *TList) Prepend(v int) {
 func (l *TList) Set(i, v int) {
 	l.prev = l.im
 	l.im = l.im.Set(i, v)
+	l.builder.Set(i, v)
 	l.std[i] = v
 }
 
@@ -265,6 +270,7 @@ func (l *TList) Set(i, v int) {
 func (l *TList) Slice(start, end int) {
 	l.prev = l.im
 	l.im = l.im.Slice(start, end)
+	l.builder.Slice(start, end)
 	l.std = l.std[start:end]
 }
 
@@ -274,53 +280,64 @@ func (l *TList) Validate() error {
 		return fmt.Errorf("Len()=%v, expected %d", got, exp)
 	}
 
+	bl := l.builder.List()
 	for i := range l.std {
 		if got, exp := l.im.Get(i), l.std[i]; got != exp {
 			return fmt.Errorf("Get(%d)=%v, expected %v", i, got, exp)
+		} else if got, exp := l.builder.Get(i), l.std[i]; got != exp {
+			return fmt.Errorf("Builder.Get(%d)=%v, expected %v", i, got, exp)
+		} else if got, exp := bl.Get(i), l.std[i]; got != exp {
+			return fmt.Errorf("Builder.List/Get(%d)=%v, expected %v", i, got, exp)
 		}
 	}
 
-	if err := l.validateForwardIterator(); err != nil {
+	if err := l.validateForwardIterator("basic", l.im); err != nil {
 		return err
-	} else if err := l.validateBackwardIterator(); err != nil {
+	} else if err := l.validateBackwardIterator("basic", l.im); err != nil {
+		return err
+	}
+
+	if err := l.validateForwardIterator("builder", bl); err != nil {
+		return err
+	} else if err := l.validateBackwardIterator("builder", bl); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (l *TList) validateForwardIterator() error {
-	itr := l.im.Iterator()
+func (l *TList) validateForwardIterator(typ string, list *List) error {
+	itr := list.Iterator()
 	for i := range l.std {
 		if j, v := itr.Next(); i != j || l.std[i] != v {
-			return fmt.Errorf("ListIterator.Next()=<%v,%v>, expected <%v,%v>", j, v, i, l.std[i])
+			return fmt.Errorf("ListIterator.Next()=<%v,%v>, expected <%v,%v> [%s]", j, v, i, l.std[i], typ)
 		}
 
 		done := i == len(l.std)-1
 		if v := itr.Done(); v != done {
-			return fmt.Errorf("ListIterator.Done()=%v, expected %v", v, done)
+			return fmt.Errorf("ListIterator.Done()=%v, expected %v [%s]", v, done, typ)
 		}
 	}
 	if i, v := itr.Next(); i != -1 || v != nil {
-		return fmt.Errorf("ListIterator.Next()=<%v,%v>, expected DONE", i, v)
+		return fmt.Errorf("ListIterator.Next()=<%v,%v>, expected DONE [%s]", i, v, typ)
 	}
 	return nil
 }
 
-func (l *TList) validateBackwardIterator() error {
-	itr := l.im.Iterator()
+func (l *TList) validateBackwardIterator(typ string, list *List) error {
+	itr := list.Iterator()
 	itr.Last()
 	for i := len(l.std) - 1; i >= 0; i-- {
 		if j, v := itr.Prev(); i != j || l.std[i] != v {
-			return fmt.Errorf("ListIterator.Prev()=<%v,%v>, expected <%v,%v>", j, v, i, l.std[i])
+			return fmt.Errorf("ListIterator.Prev()=<%v,%v>, expected <%v,%v> [%s]", j, v, i, l.std[i], typ)
 		}
 
 		done := i == 0
 		if v := itr.Done(); v != done {
-			return fmt.Errorf("ListIterator.Done()=%v, expected %v", v, done)
+			return fmt.Errorf("ListIterator.Done()=%v, expected %v [%s]", v, done, typ)
 		}
 	}
 	if i, v := itr.Prev(); i != -1 || v != nil {
-		return fmt.Errorf("ListIterator.Prev()=<%v,%v>, expected DONE", i, v)
+		return fmt.Errorf("ListIterator.Prev()=<%v,%v>, expected DONE [%s]", i, v, typ)
 	}
 	return nil
 }
@@ -384,6 +401,54 @@ func BenchmarkList_Iterator(b *testing.B) {
 			itr.Prev()
 		}
 	})
+}
+
+func BenchmarkBuiltinSlice_Append(b *testing.B) {
+	b.Run("Int", func(b *testing.B) {
+		b.ReportAllocs()
+		var a []int
+		for i := 0; i < b.N; i++ {
+			a = append(a, i)
+		}
+	})
+	b.Run("Interface", func(b *testing.B) {
+		b.ReportAllocs()
+		var a []interface{}
+		for i := 0; i < b.N; i++ {
+			a = append(a, i)
+		}
+	})
+}
+
+func BenchmarkListBuilder_Append(b *testing.B) {
+	b.ReportAllocs()
+	builder := NewListBuilder(NewList())
+	for i := 0; i < b.N; i++ {
+		builder.Append(i)
+	}
+}
+
+func BenchmarkListBuilder_Prepend(b *testing.B) {
+	b.ReportAllocs()
+	builder := NewListBuilder(NewList())
+	for i := 0; i < b.N; i++ {
+		builder.Prepend(i)
+	}
+}
+
+func BenchmarkListBuilder_Set(b *testing.B) {
+	const n = 10000
+
+	builder := NewListBuilder(NewList())
+	for i := 0; i < 10000; i++ {
+		builder.Append(i)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		builder.Set(i%n, i*10)
+	}
 }
 
 func ExampleList_Append() {
@@ -476,6 +541,67 @@ func ExampleList_Iterator_reverse() {
 	// 2 baz
 	// 1 bar
 	// 0 foo
+}
+
+func ExampleListBuilder_Append() {
+	b := NewListBuilder(NewList())
+	b.Append("foo")
+	b.Append("bar")
+	b.Append("baz")
+
+	l := b.List()
+	fmt.Println(l.Get(0))
+	fmt.Println(l.Get(1))
+	fmt.Println(l.Get(2))
+	// Output:
+	// foo
+	// bar
+	// baz
+}
+
+func ExampleListBuilder_Prepend() {
+	b := NewListBuilder(NewList())
+	b.Prepend("foo")
+	b.Prepend("bar")
+	b.Prepend("baz")
+
+	l := b.List()
+	fmt.Println(l.Get(0))
+	fmt.Println(l.Get(1))
+	fmt.Println(l.Get(2))
+	// Output:
+	// baz
+	// bar
+	// foo
+}
+
+func ExampleListBuilder_Set() {
+	b := NewListBuilder(NewList())
+	b.Append("foo")
+	b.Append("bar")
+	b.Set(1, "baz")
+
+	l := b.List()
+	fmt.Println(l.Get(0))
+	fmt.Println(l.Get(1))
+	// Output:
+	// foo
+	// baz
+}
+
+func ExampleListBuilder_Slice() {
+	b := NewListBuilder(NewList())
+	b.Append("foo")
+	b.Append("bar")
+	b.Append("baz")
+	b.Slice(1, 3)
+
+	l := b.List()
+	fmt.Println(l.Get(0))
+	fmt.Println(l.Get(1))
+	// Output:
+	// bar
+	// baz
 }
 
 // Ensure node can support overwrites as it expands.
