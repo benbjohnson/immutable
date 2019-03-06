@@ -6,8 +6,6 @@ import (
 	"math/rand"
 	"sort"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 var (
@@ -1334,8 +1332,13 @@ func (m *TMap) validateIterator(mm *Map) error {
 		k, v := itr.Next()
 		other[k.(int)] = v.(int)
 	}
-	if diff := cmp.Diff(other, m.std); diff != "" {
-		return fmt.Errorf("map iterator mismatch: %s", diff)
+	if len(other) != len(m.std) {
+		return fmt.Errorf("map iterator size mismatch: %v!=%v", len(m.std), len(other))
+	}
+	for k, v := range m.std {
+		if v != other[k] {
+			return fmt.Errorf("map iterator mismatch: key=%v, %v!=%v", k, v, other[k])
+		}
 	}
 	if k, v := itr.Next(); k != nil || v != nil {
 		return fmt.Errorf("map iterator returned key/value after done: <%v/%v>", k, v)
