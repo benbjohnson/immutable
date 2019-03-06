@@ -212,6 +212,27 @@ iterate in the same order. Ordering can be insertion order dependent when two
 keys generate the same hash.
 
 
+### Efficiently building maps
+
+If you are executing multiple mutations on a map, it can be much more efficient
+to use the `MapBuilder`. It uses nearly the same API as `Map` except that it 
+updates a map in-place until you are ready to use it. 
+
+```go
+b := immutable.NewMapBuilder(immutable.NewMap(nil))
+b.Set("foo", 100)
+b.Set("bar", 200)
+b.Set("foo", 300)
+
+m := b.Map()
+fmt.Println(m.Get("foo")) // "300"
+fmt.Println(m.Get("bar")) // "200"
+```
+
+Maps are safe to use even after you continue to use the builder. You can
+also build on top of existing maps too.
+
+
 ### Implementing a custom Hasher
 
 If you need to use a key type besides `int`, `string`, or `[]byte` then you'll
