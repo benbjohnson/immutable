@@ -687,6 +687,12 @@ func (m *Map) Len() int {
 	return m.size
 }
 
+// clone returns a shallow copy of m.
+func (m *Map) clone() *Map {
+	other := *m
+	return &other
+}
+
 // Get returns the value for a given key and a flag indicating whether the
 // key exists. This flag distinguishes a nil value set on a key versus a
 // non-existent key in the map.
@@ -703,6 +709,10 @@ func (m *Map) Get(key interface{}) (value interface{}, ok bool) {
 // This function will return a new map even if the updated value is the same as
 // the existing value because Map does not track value equality.
 func (m *Map) Set(key, value interface{}) *Map {
+	return m.set(key, value, false)
+}
+
+func (m *Map) set(key, value interface{}, mutable bool) *Map {
 	// Set a hasher on the first value if one does not already exist.
 	hasher := m.hasher
 	if hasher == nil {
@@ -718,23 +728,24 @@ func (m *Map) Set(key, value interface{}) *Map {
 		}
 	}
 
+	// Generate copy if necessary.
+	other := m
+	if !mutable {
+		other = m.clone()
+	}
+	other.hasher = hasher
+
 	// If the map is empty, initialize with a simple array node.
 	if m.root == nil {
-		return &Map{
-			size:   1,
-			root:   &mapArrayNode{entries: []mapEntry{{key: key, value: value}}},
-			hasher: hasher,
-		}
+		other.size = 1
+		other.root = &mapArrayNode{entries: []mapEntry{{key: key, value: value}}}
+		return other
 	}
 
 	// Otherwise copy the map and delegate insertion to the root.
 	// Resized will return true if the key does not currently exist.
 	var resized bool
-	other := &Map{
-		size:   m.size,
-		root:   m.root.set(key, value, 0, hasher.Hash(key), hasher, &resized),
-		hasher: hasher,
-	}
+	other.root = m.root.set(key, value, 0, hasher.Hash(key), hasher, mutable, &resized)
 	if resized {
 		other.size++
 	}
@@ -744,23 +755,32 @@ func (m *Map) Set(key, value interface{}) *Map {
 // Delete returns a map with the given key removed.
 // Removing a non-existent key will cause this method to return the same map.
 func (m *Map) Delete(key interface{}) *Map {
+	return m.delete(key, false)
+}
+
+func (m *Map) delete(key interface{}, mutable bool) *Map {
 	// Return original map if no keys exist.
 	if m.root == nil {
 		return m
 	}
 
 	// If the delete did not change the node then return the original map.
-	newRoot := m.root.delete(key, 0, m.hasher.Hash(key), m.hasher)
-	if newRoot == m.root {
+	var resized bool
+	newRoot := m.root.delete(key, 0, m.hasher.Hash(key), m.hasher, mutable, &resized)
+	if !resized {
 		return m
 	}
 
-	// Return copy of map with new root and decreased size.
-	return &Map{
-		size:   m.size - 1,
-		root:   newRoot,
-		hasher: m.hasher,
+	// Generate copy if necessary.
+	other := m
+	if !mutable {
+		other = m.clone()
 	}
+
+	// Return copy of map with new root and decreased size.
+	other.size = m.size - 1
+	other.root = newRoot
+	return other
 }
 
 // Iterator returns a new iterator for the map.
@@ -770,11 +790,56 @@ func (m *Map) Iterator() *MapIterator {
 	return itr
 }
 
+// MapBuilder represents an efficient builder for creating Maps.
+//
+// Maps returned from the builder are safe to use even after you continue to
+// use the builder. However, for efficiency, you should only retrieve your map
+// after you have completed building it.
+type MapBuilder struct {
+	m       *Map // current state
+	mutable bool // if true, next mutation will operate in-place.
+}
+
+// NewMapBuilder returns a new instance of MapBuilder to build on a base map.
+func NewMapBuilder(m *Map) *MapBuilder {
+	return &MapBuilder{m: m}
+}
+
+// Map returns the current copy of the map.
+// The returned map is safe to use even if after the builder continues to be used.
+func (b *MapBuilder) Map() *Map {
+	m := b.m
+	b.mutable = false
+	return m
+}
+
+// Len returns the number of elements in the underlying map.
+func (b *MapBuilder) Len() int {
+	return b.m.Len()
+}
+
+// Get returns the value for the given key.
+func (b *MapBuilder) Get(key interface{}) (value interface{}, ok bool) {
+	return b.m.Get(key)
+}
+
+// Set sets the value of the given key. See Map.Set() for additional details.
+func (b *MapBuilder) Set(key, value interface{}) {
+	b.m = b.m.set(key, value, b.mutable)
+	b.mutable = true
+}
+
+// Delete removes the given key. See Map.Delete() for additional details.
+func (b *MapBuilder) Delete(key interface{}) {
+	b.m = b.m.delete(key, b.mutable)
+	b.mutable = true
+}
+
 // mapNode represents any node in the map tree.
 type mapNode interface {
 	get(key interface{}, shift uint, keyHash uint32, h Hasher) (value interface{}, ok bool)
-	set(key, value interface{}, shift uint, keyHash uint32, h Hasher, resized *bool) mapNode
-	delete(key interface{}, shift uint, keyHash uint32, h Hasher) mapNode
+	set(key, value interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode
+	delete(key interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode
 }
 
 var _ mapNode = (*mapArrayNode)(nil)
@@ -820,7 +885,7 @@ func (n *mapArrayNode) get(key interface{}, shift uint, keyHash uint32, h Hasher
 
 // set inserts or updates the value for a given key. If the key is inserted and
 // the new size crosses the max size threshold, a bitmap indexed node is returned.
-func (n *mapArrayNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, resized *bool) mapNode {
+func (n *mapArrayNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	idx := n.indexOf(key, h)
 
 	// Mark as resized if the key doesn't exist.
@@ -833,9 +898,19 @@ func (n *mapArrayNode) set(key, value interface{}, shift uint, keyHash uint32, h
 	if idx == -1 && len(n.entries) >= maxArrayMapSize {
 		var node mapNode = newMapValueNode(h.Hash(key), key, value)
 		for _, entry := range n.entries {
-			node = node.set(entry.key, entry.value, 0, h.Hash(entry.key), h, resized)
+			node = node.set(entry.key, entry.value, 0, h.Hash(entry.key), h, false, resized)
 		}
 		return node
+	}
+
+	// Update in-place if mutable.
+	if mutable {
+		if idx != -1 {
+			n.entries[idx] = mapEntry{key, value}
+		} else {
+			n.entries = append(n.entries, mapEntry{key, value})
+		}
+		return n
 	}
 
 	// Update existing entry if a match is found.
@@ -855,17 +930,26 @@ func (n *mapArrayNode) set(key, value interface{}, shift uint, keyHash uint32, h
 
 // delete removes the given key from the node. Returns the same node if key does
 // not exist. Returns a nil node when removing the last entry.
-func (n *mapArrayNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher) mapNode {
+func (n *mapArrayNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	idx := n.indexOf(key, h)
 
 	// Return original node if key does not exist.
 	if idx == -1 {
 		return n
 	}
+	*resized = true
 
 	// Return nil if this node will contain no nodes.
 	if len(n.entries) == 1 {
 		return nil
+	}
+
+	// Update in-place, if mutable.
+	if mutable {
+		copy(n.entries[idx:], n.entries[idx+1:])
+		n.entries[len(n.entries)-1] = mapEntry{}
+		n.entries = n.entries[:len(n.entries)-1]
+		return n
 	}
 
 	// Otherwise create a copy with the given entry removed.
@@ -895,7 +979,7 @@ func (n *mapBitmapIndexedNode) get(key interface{}, shift uint, keyHash uint32, 
 
 // set inserts or updates the value for the given key. If a new key is inserted
 // and the size crosses the max size threshold then a hash array node is returned.
-func (n *mapBitmapIndexedNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, resized *bool) mapNode {
+func (n *mapBitmapIndexedNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	// Extract the index for the bit segment of the key hash.
 	keyHashFrag := (keyHash >> shift) & mapNodeMask
 
@@ -915,7 +999,7 @@ func (n *mapBitmapIndexedNode) set(key, value interface{}, shift uint, keyHash u
 	// If the node doesn't exist then create a simple value leaf node.
 	var newNode mapNode
 	if exists {
-		newNode = n.nodes[idx].set(key, value, shift+mapNodeBits, keyHash, h, resized)
+		newNode = n.nodes[idx].set(key, value, shift+mapNodeBits, keyHash, h, mutable, resized)
 	} else {
 		newNode = newMapValueNode(keyHash, key, value)
 	}
@@ -933,6 +1017,19 @@ func (n *mapBitmapIndexedNode) set(key, value interface{}, shift uint, keyHash u
 		other.nodes[keyHashFrag] = newNode
 		other.count++
 		return &other
+	}
+
+	// Update in-place if mutable.
+	if mutable {
+		if exists {
+			n.nodes[idx] = newNode
+		} else {
+			n.bitmap |= bit
+			n.nodes = append(n.nodes, nil)
+			copy(n.nodes[idx+1:], n.nodes[idx:])
+			n.nodes[idx] = newNode
+		}
+		return n
 	}
 
 	// If node exists at given slot then overwrite it with new node.
@@ -954,7 +1051,7 @@ func (n *mapBitmapIndexedNode) set(key, value interface{}, shift uint, keyHash u
 // delete removes the key from the tree. If the key does not exist then the
 // original node is returned. If removing the last child node then a nil is
 // returned. Note that shrinking the node will not convert it to an array node.
-func (n *mapBitmapIndexedNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher) mapNode {
+func (n *mapBitmapIndexedNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	bit := uint32(1) << ((keyHash >> shift) & mapNodeMask)
 
 	// Return original node if key does not exist.
@@ -967,10 +1064,10 @@ func (n *mapBitmapIndexedNode) delete(key interface{}, shift uint, keyHash uint3
 
 	// Delegate delete to child node.
 	child := n.nodes[idx]
-	newChild := child.delete(key, shift+mapNodeBits, keyHash, h)
+	newChild := child.delete(key, shift+mapNodeBits, keyHash, h, mutable, resized)
 
 	// Return original node if key doesn't exist in child.
-	if newChild == child {
+	if !*resized {
 		return n
 	}
 
@@ -981,6 +1078,15 @@ func (n *mapBitmapIndexedNode) delete(key interface{}, shift uint, keyHash uint3
 			return nil
 		}
 
+		// Update in-place if mutable.
+		if mutable {
+			n.bitmap ^= bit
+			copy(n.nodes[idx:], n.nodes[idx+1:])
+			n.nodes[len(n.nodes)-1] = nil
+			n.nodes = n.nodes[:len(n.nodes)-1]
+			return n
+		}
+
 		// Return copy with bit removed from bitmap and node removed from node list.
 		other := &mapBitmapIndexedNode{bitmap: n.bitmap ^ bit, nodes: make([]mapNode, len(n.nodes)-1)}
 		copy(other.nodes[:idx], n.nodes[:idx])
@@ -988,9 +1094,14 @@ func (n *mapBitmapIndexedNode) delete(key interface{}, shift uint, keyHash uint3
 		return other
 	}
 
-	// Return copy with child updated.
-	other := &mapBitmapIndexedNode{bitmap: n.bitmap, nodes: make([]mapNode, len(n.nodes))}
-	copy(other.nodes, n.nodes)
+	// Generate copy, if necessary.
+	other := n
+	if !mutable {
+		other = &mapBitmapIndexedNode{bitmap: n.bitmap, nodes: make([]mapNode, len(n.nodes))}
+		copy(other.nodes, n.nodes)
+	}
+
+	// Update child.
 	other.nodes[idx] = newChild
 	return other
 }
@@ -1000,6 +1111,12 @@ func (n *mapBitmapIndexedNode) delete(key interface{}, shift uint, keyHash uint3
 type mapHashArrayNode struct {
 	count uint                 // number of set nodes
 	nodes [mapNodeSize]mapNode // child node slots, may contain empties
+}
+
+// clone returns a shallow copy of n.
+func (n *mapHashArrayNode) clone() *mapHashArrayNode {
+	other := *n
+	return &other
 }
 
 // get returns the value for the given key.
@@ -1012,7 +1129,7 @@ func (n *mapHashArrayNode) get(key interface{}, shift uint, keyHash uint32, h Ha
 }
 
 // set returns a node with the value set for the given key.
-func (n *mapHashArrayNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, resized *bool) mapNode {
+func (n *mapHashArrayNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	idx := (keyHash >> shift) & mapNodeMask
 	node := n.nodes[idx]
 
@@ -1023,22 +1140,27 @@ func (n *mapHashArrayNode) set(key, value interface{}, shift uint, keyHash uint3
 		*resized = true
 		newNode = newMapValueNode(keyHash, key, value)
 	} else {
-		newNode = node.set(key, value, shift+mapNodeBits, keyHash, h, resized)
+		newNode = node.set(key, value, shift+mapNodeBits, keyHash, h, mutable, resized)
 	}
 
-	// Return a copy of node with updated child node (and updated size, if new).
-	other := *n
+	// Generate copy, if necessary.
+	other := n
+	if !mutable {
+		other = n.clone()
+	}
+
+	// Update child node (and update size, if new).
 	if node == nil {
 		other.count++
 	}
 	other.nodes[idx] = newNode
-	return &other
+	return other
 }
 
 // delete returns a node with the given key removed. Returns the same node if
 // the key does not exist. If node shrinks to within bitmap-indexed size then
 // converts to a bitmap-indexed node.
-func (n *mapHashArrayNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher) mapNode {
+func (n *mapHashArrayNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	idx := (keyHash >> shift) & mapNodeMask
 	node := n.nodes[idx]
 
@@ -1048,8 +1170,8 @@ func (n *mapHashArrayNode) delete(key interface{}, shift uint, keyHash uint32, h
 	}
 
 	// Return original node if child is unchanged.
-	newNode := node.delete(key, shift+mapNodeBits, keyHash, h)
-	if newNode == node {
+	newNode := node.delete(key, shift+mapNodeBits, keyHash, h, mutable, resized)
+	if !*resized {
 		return n
 	}
 
@@ -1065,13 +1187,18 @@ func (n *mapHashArrayNode) delete(key interface{}, shift uint, keyHash uint32, h
 		return other
 	}
 
+	// Generate copy, if necessary.
+	other := n
+	if !mutable {
+		other = n.clone()
+	}
+
 	// Return copy of node with child updated.
-	other := *n
 	other.nodes[idx] = newNode
 	if newNode == nil {
 		other.count--
 	}
-	return &other
+	return other
 }
 
 // mapValueNode represents a leaf node with a single key/value pair.
@@ -1109,9 +1236,15 @@ func (n *mapValueNode) get(key interface{}, shift uint, keyHash uint32, h Hasher
 // the node's key then a new value node is returned. If key is not equal to the
 // node's key but has the same hash then a hash collision node is returned.
 // Otherwise the nodes are merged into a branch node.
-func (n *mapValueNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, resized *bool) mapNode {
+func (n *mapValueNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	// If the keys match then return a new value node overwriting the value.
 	if h.Equal(n.key, key) {
+		// Update in-place if mutable.
+		if mutable {
+			n.value = value
+			return n
+		}
+		// Otherwise return a new copy.
 		return newMapValueNode(n.keyHash, key, value)
 	}
 
@@ -1130,13 +1263,14 @@ func (n *mapValueNode) set(key, value interface{}, shift uint, keyHash uint32, h
 }
 
 // delete returns nil if the key matches the node's key. Otherwise returns the original node.
-func (n *mapValueNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher) mapNode {
+func (n *mapValueNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	// Return original node if the keys do not match.
 	if !h.Equal(n.key, key) {
 		return n
 	}
 
 	// Otherwise remove the node if keys do match.
+	*resized = true
 	return nil
 }
 
@@ -1174,11 +1308,22 @@ func (n *mapHashCollisionNode) get(key interface{}, shift uint, keyHash uint32, 
 }
 
 // set returns a copy of the node with key set to the given value.
-func (n *mapHashCollisionNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, resized *bool) mapNode {
+func (n *mapHashCollisionNode) set(key, value interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	// Merge node with key/value pair if this is not a hash collision.
 	if n.keyHash != keyHash {
 		*resized = true
 		return mergeIntoNode(n, shift, keyHash, key, value)
+	}
+
+	// Update in-place if mutable.
+	if mutable {
+		if idx := n.indexOf(key, h); idx == -1 {
+			*resized = true
+			n.entries = append(n.entries, mapEntry{key, value})
+		} else {
+			n.entries[idx] = mapEntry{key, value}
+		}
+		return n
 	}
 
 	// Append to end of node if key doesn't exist & mark resized.
@@ -1200,13 +1345,16 @@ func (n *mapHashCollisionNode) set(key, value interface{}, shift uint, keyHash u
 // delete returns a node with the given key deleted. Returns the same node if
 // the key does not exist. If removing the key would shrink the node to a single
 // entry then a value node is returned.
-func (n *mapHashCollisionNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher) mapNode {
+func (n *mapHashCollisionNode) delete(key interface{}, shift uint, keyHash uint32, h Hasher, mutable bool, resized *bool) mapNode {
 	idx := n.indexOf(key, h)
 
 	// Return original node if key is not found.
 	if idx == -1 {
 		return n
 	}
+
+	// Mark as resized if key exists.
+	*resized = true
 
 	// Convert to value node if we move to one entry.
 	if len(n.entries) == 2 {
@@ -1217,7 +1365,15 @@ func (n *mapHashCollisionNode) delete(key interface{}, shift uint, keyHash uint3
 		}
 	}
 
-	// Otherwise return copy with entry removed.
+	// Remove entry in-place if mutable.
+	if mutable {
+		copy(n.entries[idx:], n.entries[idx+1:])
+		n.entries[len(n.entries)-1] = mapEntry{}
+		n.entries = n.entries[:len(n.entries)-1]
+		return n
+	}
+
+	// Return copy without entry if immutable.
 	other := &mapHashCollisionNode{keyHash: n.keyHash, entries: make([]mapEntry, len(n.entries)-1)}
 	copy(other.entries[:idx], n.entries[:idx])
 	copy(other.entries[idx:], n.entries[idx+1:])
