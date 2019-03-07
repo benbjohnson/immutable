@@ -263,7 +263,8 @@ built-in comparer implementations for `int`, `string`, and `[]byte` keys. You
 may pass a `nil` comparer to `NewSortedMap()` if you are using one of these key
 types.
 
-The API is identical to the `Map` implementation.
+The API is identical to the `Map` implementation. The sorted map also has a
+companion `SortedMapBuilder` for more efficiently building maps.
 
 
 ### Implementing a custom Comparer

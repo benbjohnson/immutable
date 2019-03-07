@@ -1577,6 +1577,10 @@ func (m *SortedMap) Get(key interface{}) (interface{}, bool) {
 
 // Set returns a copy of the map with the key set to the given value.
 func (m *SortedMap) Set(key, value interface{}) *SortedMap {
+	return m.set(key, value, false)
+}
+
+func (m *SortedMap) set(key, value interface{}, mutable bool) *SortedMap {
 	// Set a comparer on the first value if one does not already exist.
 	comparer := m.comparer
 	if comparer == nil {
@@ -1592,29 +1596,31 @@ func (m *SortedMap) Set(key, value interface{}) *SortedMap {
 		}
 	}
 
+	// Create copy, if necessary.
+	other := m
+	if !mutable {
+		other = m.clone()
+	}
+	other.comparer = comparer
+
 	// If no values are set then initialize with a leaf node.
 	if m.root == nil {
-		return &SortedMap{
-			size:     1,
-			root:     &sortedMapLeafNode{entries: []mapEntry{{key: key, value: value}}},
-			comparer: comparer,
-		}
+		other.size = 1
+		other.root = &sortedMapLeafNode{entries: []mapEntry{{key: key, value: value}}}
+		return other
 	}
 
 	// Otherwise delegate to root node.
 	// If a split occurs then grow the tree from the root.
 	var resized bool
-	newRoot, splitNode := m.root.set(key, value, comparer, &resized)
+	newRoot, splitNode := m.root.set(key, value, comparer, mutable, &resized)
 	if splitNode != nil {
 		newRoot = newSortedMapBranchNode(newRoot, splitNode)
 	}
 
-	// Return a new map with the new root.
-	other := &SortedMap{
-		size:     m.size,
-		root:     newRoot,
-		comparer: comparer,
-	}
+	// Update root and size (if resized).
+	other.size = m.size
+	other.root = newRoot
 	if resized {
 		other.size++
 	}
@@ -1624,23 +1630,38 @@ func (m *SortedMap) Set(key, value interface{}) *SortedMap {
 // Delete returns a copy of the map with the key removed.
 // Returns the original map if key does not exist.
 func (m *SortedMap) Delete(key interface{}) *SortedMap {
+	return m.delete(key, false)
+}
+
+func (m *SortedMap) delete(key interface{}, mutable bool) *SortedMap {
 	// Return original map if no keys exist.
 	if m.root == nil {
 		return m
 	}
 
 	// If the delete did not change the node then return the original map.
-	newRoot := m.root.delete(key, m.comparer)
-	if newRoot == m.root {
+	var resized bool
+	newRoot := m.root.delete(key, m.comparer, mutable, &resized)
+	if !resized {
 		return m
 	}
 
-	// Return new copy with the root and size updated.
-	return &SortedMap{
-		size:     m.size - 1,
-		root:     newRoot,
-		comparer: m.comparer,
+	// Create copy, if necessary.
+	other := m
+	if !mutable {
+		other = m.clone()
 	}
+
+	// Update root and size.
+	other.size = m.size - 1
+	other.root = newRoot
+	return other
+}
+
+// clone returns a shallow copy of m.
+func (m *SortedMap) clone() *SortedMap {
+	other := *m
+	return &other
 }
 
 // Iterator returns a new iterator for this map positioned at the first key.
@@ -1650,13 +1671,58 @@ func (m *SortedMap) Iterator() *SortedMapIterator {
 	return itr
 }
 
+// SortedMapBuilder represents an efficient builder for creating sorted maps.
+//
+// Maps returned from the builder are safe to use even after you continue to
+// use the builder. However, for efficiency, you should only retrieve your map
+// after you have completed building it.
+type SortedMapBuilder struct {
+	m       *SortedMap // current state
+	mutable bool       // if true, next mutation will operate in-place.
+}
+
+// NewSortedMapBuilder returns a new instance of SortedMapBuilder to build on a base map.
+func NewSortedMapBuilder(m *SortedMap) *SortedMapBuilder {
+	return &SortedMapBuilder{m: m}
+}
+
+// SortedMap returns the current copy of the map.
+// The returned map is safe to use even if after the builder continues to be used.
+func (b *SortedMapBuilder) Map() *SortedMap {
+	m := b.m
+	b.mutable = false
+	return m
+}
+
+// Len returns the number of elements in the underlying map.
+func (b *SortedMapBuilder) Len() int {
+	return b.m.Len()
+}
+
+// Get returns the value for the given key.
+func (b *SortedMapBuilder) Get(key interface{}) (value interface{}, ok bool) {
+	return b.m.Get(key)
+}
+
+// Set sets the value of the given key. See SortedMap.Set() for additional details.
+func (b *SortedMapBuilder) Set(key, value interface{}) {
+	b.m = b.m.set(key, value, b.mutable)
+	b.mutable = true
+}
+
+// Delete removes the given key. See SortedMap.Delete() for additional details.
+func (b *SortedMapBuilder) Delete(key interface{}) {
+	b.m = b.m.delete(key, b.mutable)
+	b.mutable = true
+}
+
 // sortedMapNode represents a branch or leaf node in the sorted map.
 type sortedMapNode interface {
 	minKey() interface{}
 	indexOf(key interface{}, c Comparer) int
 	get(key interface{}, c Comparer) (value interface{}, ok bool)
-	set(key, value interface{}, c Comparer, resized *bool) (sortedMapNode, sortedMapNode)
-	delete(key interface{}, c Comparer) sortedMapNode
+	set(key, value interface{}, c Comparer, mutable bool, resized *bool) (sortedMapNode, sortedMapNode)
+	delete(key interface{}, c Comparer, mutable bool, resized *bool) sortedMapNode
 }
 
 var _ sortedMapNode = (*sortedMapBranchNode)(nil)
@@ -1701,11 +1767,30 @@ func (n *sortedMapBranchNode) get(key interface{}, c Comparer) (value interface{
 }
 
 // set returns a copy of the node with the key set to the given value.
-func (n *sortedMapBranchNode) set(key, value interface{}, c Comparer, resized *bool) (sortedMapNode, sortedMapNode) {
+func (n *sortedMapBranchNode) set(key, value interface{}, c Comparer, mutable bool, resized *bool) (sortedMapNode, sortedMapNode) {
 	idx := n.indexOf(key, c)
 
 	// Delegate insert to child node.
-	newNode, splitNode := n.elems[idx].node.set(key, value, c, resized)
+	newNode, splitNode := n.elems[idx].node.set(key, value, c, mutable, resized)
+
+	// Update in-place, if mutable.
+	if mutable {
+		n.elems[idx] = sortedMapBranchElem{key: newNode.minKey(), node: newNode}
+		if splitNode != nil {
+			n.elems = append(n.elems, sortedMapBranchElem{})
+			copy(n.elems[idx+1:], n.elems[idx:])
+			n.elems[idx+1] = sortedMapBranchElem{key: splitNode.minKey(), node: splitNode}
+		}
+
+		// If the child splits and we have no more room then we split too.
+		if len(n.elems) > sortedMapNodeSize {
+			splitIdx := len(n.elems) / 2
+			newNode := &sortedMapBranchNode{elems: n.elems[:splitIdx:splitIdx]}
+			splitNode := &sortedMapBranchNode{elems: n.elems[splitIdx:]}
+			return newNode, splitNode
+		}
+		return n, nil
+	}
 
 	// If no split occurs, copy branch and update keys.
 	// If the child splits, insert new key/child into copy of branch.
@@ -1734,7 +1819,7 @@ func (n *sortedMapBranchNode) set(key, value interface{}, c Comparer, resized *b
 	// If the child splits and we have no more room then we split too.
 	if len(other.elems) > sortedMapNodeSize {
 		splitIdx := len(other.elems) / 2
-		newNode := &sortedMapBranchNode{elems: other.elems[:splitIdx]}
+		newNode := &sortedMapBranchNode{elems: other.elems[:splitIdx:splitIdx]}
 		splitNode := &sortedMapBranchNode{elems: other.elems[splitIdx:]}
 		return newNode, splitNode
 	}
@@ -1745,12 +1830,12 @@ func (n *sortedMapBranchNode) set(key, value interface{}, c Comparer, resized *b
 
 // delete returns a node with the key removed. Returns the same node if the key
 // does not exist. Returns nil if all child nodes are removed.
-func (n *sortedMapBranchNode) delete(key interface{}, c Comparer) sortedMapNode {
+func (n *sortedMapBranchNode) delete(key interface{}, c Comparer, mutable bool, resized *bool) sortedMapNode {
 	idx := n.indexOf(key, c)
 
 	// Return original node if child has not changed.
-	newNode := n.elems[idx].node.delete(key, c)
-	if newNode == n.elems[idx].node {
+	newNode := n.elems[idx].node.delete(key, c, mutable, resized)
+	if !*resized {
 		return n
 	}
 
@@ -1761,11 +1846,25 @@ func (n *sortedMapBranchNode) delete(key interface{}, c Comparer) sortedMapNode 
 			return nil
 		}
 
+		// If mutable, update in-place.
+		if mutable {
+			copy(n.elems[idx:], n.elems[idx+1:])
+			n.elems[len(n.elems)-1] = sortedMapBranchElem{}
+			n.elems = n.elems[:len(n.elems)-1]
+			return n
+		}
+
 		// Return a copy without the given node.
 		other := &sortedMapBranchNode{elems: make([]sortedMapBranchElem, len(n.elems)-1)}
 		copy(other.elems[:idx], n.elems[:idx])
 		copy(other.elems[idx:], n.elems[idx+1:])
 		return other
+	}
+
+	// If mutable, update in-place.
+	if mutable {
+		n.elems[idx] = sortedMapBranchElem{key: newNode.minKey(), node: newNode}
+		return n
 	}
 
 	// Return a copy with the updated node.
@@ -1815,14 +1914,34 @@ func (n *sortedMapLeafNode) get(key interface{}, c Comparer) (value interface{},
 
 // set returns a copy of node with the key set to the given value. If the update
 // causes the node to grow beyond the maximum size then it is split in two.
-func (n *sortedMapLeafNode) set(key, value interface{}, c Comparer, resized *bool) (sortedMapNode, sortedMapNode) {
+func (n *sortedMapLeafNode) set(key, value interface{}, c Comparer, mutable bool, resized *bool) (sortedMapNode, sortedMapNode) {
 	// Find the insertion index for the key.
 	idx := n.indexOf(key, c)
+	exists := idx < len(n.entries) && c.Compare(n.entries[idx].key, key) == 0
+
+	// Update in-place, if mutable.
+	if mutable {
+		if !exists {
+			*resized = true
+			n.entries = append(n.entries, mapEntry{})
+			copy(n.entries[idx+1:], n.entries[idx:])
+		}
+		n.entries[idx] = mapEntry{key: key, value: value}
+
+		// If the key doesn't exist and we exceed our max allowed values then split.
+		if len(n.entries) > sortedMapNodeSize {
+			splitIdx := len(n.entries) / 2
+			newNode := &sortedMapLeafNode{entries: n.entries[:splitIdx:splitIdx]}
+			splitNode := &sortedMapLeafNode{entries: n.entries[splitIdx:]}
+			return newNode, splitNode
+		}
+		return n, nil
+	}
 
 	// If the key matches then simply return a copy with the entry overridden.
 	// If there is no match then insert new entry and mark as resized.
 	var newEntries []mapEntry
-	if idx < len(n.entries) && c.Compare(n.entries[idx].key, key) == 0 {
+	if exists {
 		newEntries = make([]mapEntry, len(n.entries))
 		copy(newEntries, n.entries)
 		newEntries[idx] = mapEntry{key: key, value: value}
@@ -1836,8 +1955,9 @@ func (n *sortedMapLeafNode) set(key, value interface{}, c Comparer, resized *boo
 
 	// If the key doesn't exist and we exceed our max allowed values then split.
 	if len(newEntries) > sortedMapNodeSize {
-		newNode := &sortedMapLeafNode{entries: newEntries[:len(newEntries)/2]}
-		splitNode := &sortedMapLeafNode{entries: newEntries[len(newEntries)/2:]}
+		splitIdx := len(newEntries) / 2
+		newNode := &sortedMapLeafNode{entries: newEntries[:splitIdx:splitIdx]}
+		splitNode := &sortedMapLeafNode{entries: newEntries[splitIdx:]}
 		return newNode, splitNode
 	}
 
@@ -1847,17 +1967,26 @@ func (n *sortedMapLeafNode) set(key, value interface{}, c Comparer, resized *boo
 
 // delete returns a copy of node with key removed. Returns the original node if
 // the key does not exist. Returns nil if the removed key is the last remaining key.
-func (n *sortedMapLeafNode) delete(key interface{}, c Comparer) sortedMapNode {
+func (n *sortedMapLeafNode) delete(key interface{}, c Comparer, mutable bool, resized *bool) sortedMapNode {
 	idx := n.indexOf(key, c)
 
 	// Return original node if key is not found.
 	if idx >= len(n.entries) || c.Compare(n.entries[idx].key, key) != 0 {
 		return n
 	}
+	*resized = true
 
 	// If this is the last entry then return nil.
 	if len(n.entries) == 1 {
 		return nil
+	}
+
+	// Update in-place, if mutable.
+	if mutable {
+		copy(n.entries[idx:], n.entries[idx+1:])
+		n.entries[len(n.entries)-1] = mapEntry{}
+		n.entries = n.entries[:len(n.entries)-1]
+		return n
 	}
 
 	// Return copy of node with entry removed.
