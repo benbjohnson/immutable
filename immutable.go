@@ -246,6 +246,11 @@ func (b *ListBuilder) List() *List {
 	return list
 }
 
+// Len returns the number of elements in the underlying list.
+func (b *ListBuilder) Len() int {
+	return b.list.Len()
+}
+
 // Get returns the value at the given index. Similar to slices, this method will
 // panic if index is below zero or is greater than or equal to the list size.
 func (b *ListBuilder) Get(index int) interface{} {

@@ -274,7 +274,9 @@ func (l *TList) Slice(start, end int) {
 
 // Validate returns an error if the slice and List are different.
 func (l *TList) Validate() error {
-	if got, exp := len(l.std), l.im.Len(); got != exp {
+	if got, exp := l.im.Len(), len(l.std); got != exp {
+		return fmt.Errorf("Len()=%v, expected %d", got, exp)
+	} else if got, exp := l.builder.Len(), len(l.std); got != exp {
 		return fmt.Errorf("Len()=%v, expected %d", got, exp)
 	}
 
