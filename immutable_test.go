@@ -1545,7 +1545,7 @@ func TestInternalSortedMapLeafNode(t *testing.T) {
 		for _, i := range rand.Perm(32) {
 			var resized bool
 			var splitNode sortedMapNode
-			node, splitNode = node.set(i, i*10, &cmpr, &resized)
+			node, splitNode = node.set(i, i*10, &cmpr, false, &resized)
 			if !resized {
 				t.Fatal("expected resize")
 			} else if splitNode != nil {
@@ -1578,11 +1578,11 @@ func TestInternalSortedMapLeafNode(t *testing.T) {
 		var node sortedMapNode = &sortedMapLeafNode{}
 		for _, i := range rand.Perm(32) {
 			var resized bool
-			node, _ = node.set(i, i*2, &cmpr, &resized)
+			node, _ = node.set(i, i*2, &cmpr, false, &resized)
 		}
 		for _, i := range rand.Perm(32) {
 			var resized bool
-			node, _ = node.set(i, i*3, &cmpr, &resized)
+			node, _ = node.set(i, i*3, &cmpr, false, &resized)
 			if resized {
 				t.Fatal("expected no resize")
 			}
@@ -1602,12 +1602,12 @@ func TestInternalSortedMapLeafNode(t *testing.T) {
 		var node sortedMapNode = &sortedMapLeafNode{}
 		for i := 0; i < 32; i++ {
 			var resized bool
-			node, _ = node.set(i, i*10, &cmpr, &resized)
+			node, _ = node.set(i, i*10, &cmpr, false, &resized)
 		}
 
 		// Add one more and expect split.
 		var resized bool
-		newNode, splitNode := node.set(32, 320, &cmpr, &resized)
+		newNode, splitNode := node.set(32, 320, &cmpr, false, &resized)
 
 		// Verify node contents.
 		newLeafNode, ok := newNode.(*sortedMapLeafNode)
@@ -1658,7 +1658,7 @@ func TestInternalSortedMapBranchNode(t *testing.T) {
 
 			var resized bool
 			var splitNode sortedMapNode
-			node, splitNode = node.set(key, key*10, &cmpr, &resized)
+			node, splitNode = node.set(key, key*10, &cmpr, false, &resized)
 			if key == leaf0.entries[0].key || key == leaf1.entries[0].key {
 				if resized {
 					t.Fatalf("expected no resize: key=%d", key)
@@ -1701,7 +1701,7 @@ func TestInternalSortedMapBranchNode(t *testing.T) {
 
 		// Add one more and expect split.
 		var resized bool
-		newNode, splitNode := node.set((32 * 32), (32*32)*100, &cmpr, &resized)
+		newNode, splitNode := node.set((32 * 32), (32*32)*100, &cmpr, false, &resized)
 
 		// Verify node contents.
 		var idx int
@@ -1843,7 +1843,7 @@ func TestSortedMap_Set(t *testing.T) {
 	})
 
 	RunRandom(t, "Random", func(t *testing.T, rand *rand.Rand) {
-		m := NewTestSortedMap()
+		m := NewTSortedMap()
 		for j := 0; j < 10000; j++ {
 			switch rand.Intn(2) {
 			case 1: // overwrite
@@ -1950,7 +1950,7 @@ func TestSortedMap_Delete(t *testing.T) {
 	})
 
 	RunRandom(t, "Random", func(t *testing.T, rand *rand.Rand) {
-		m := NewTestSortedMap()
+		m := NewTSortedMap()
 		for j := 0; j < 10000; j++ {
 			switch rand.Intn(8) {
 			case 0: // overwrite
@@ -1962,6 +1962,16 @@ func TestSortedMap_Delete(t *testing.T) {
 			default: // set new key
 				m.Set(m.NewKey(rand), rand.Intn(10000))
 			}
+		}
+		if err := m.Validate(); err != nil {
+			t.Fatal(err)
+		}
+
+		// Delete all keys.
+		keys := make([]int, len(m.keys))
+		copy(keys, m.keys)
+		for _, k := range keys {
+			m.Delete(k)
 		}
 		if err := m.Validate(); err != nil {
 			t.Fatal(err)
@@ -2057,21 +2067,23 @@ func TestSortedMap_Iterator(t *testing.T) {
 	})
 }
 
-// TestSortedMap represents a combined immutable and stdlib sorted map.
-type TestSortedMap struct {
+// TSortedMap represents a combined immutable and stdlib sorted map.
+type TSortedMap struct {
 	im, prev *SortedMap
+	builder  *SortedMapBuilder
 	std      map[int]int
 	keys     []int
 }
 
-func NewTestSortedMap() *TestSortedMap {
-	return &TestSortedMap{
-		im:  NewSortedMap(nil),
-		std: make(map[int]int),
+func NewTSortedMap() *TSortedMap {
+	return &TSortedMap{
+		im:      NewSortedMap(nil),
+		builder: NewSortedMapBuilder(NewSortedMap(nil)),
+		std:     make(map[int]int),
 	}
 }
 
-func (m *TestSortedMap) NewKey(rand *rand.Rand) int {
+func (m *TSortedMap) NewKey(rand *rand.Rand) int {
 	for {
 		k := rand.Int()
 		if _, ok := m.std[k]; !ok {
@@ -2080,16 +2092,17 @@ func (m *TestSortedMap) NewKey(rand *rand.Rand) int {
 	}
 }
 
-func (m *TestSortedMap) ExistingKey(rand *rand.Rand) int {
+func (m *TSortedMap) ExistingKey(rand *rand.Rand) int {
 	if len(m.keys) == 0 {
 		return 0
 	}
 	return m.keys[rand.Intn(len(m.keys))]
 }
 
-func (m *TestSortedMap) Set(k, v int) {
+func (m *TSortedMap) Set(k, v int) {
 	m.prev = m.im
 	m.im = m.im.Set(k, v)
+	m.builder.Set(k, v)
 
 	if _, ok := m.std[k]; !ok {
 		m.keys = append(m.keys, k)
@@ -2098,9 +2111,10 @@ func (m *TestSortedMap) Set(k, v int) {
 	m.std[k] = v
 }
 
-func (m *TestSortedMap) Delete(k int) {
+func (m *TSortedMap) Delete(k int) {
 	m.prev = m.im
 	m.im = m.im.Delete(k)
+	m.builder.Delete(k)
 	delete(m.std, k)
 
 	for i := range m.keys {
@@ -2111,26 +2125,41 @@ func (m *TestSortedMap) Delete(k int) {
 	}
 }
 
-func (m *TestSortedMap) Validate() error {
+func (m *TSortedMap) Validate() error {
 	for _, k := range m.keys {
 		if v, ok := m.im.Get(k); !ok {
 			return fmt.Errorf("key not found: %d", k)
 		} else if v != m.std[k] {
 			return fmt.Errorf("key (%d) mismatch: immutable=%d, std=%d", k, v, m.std[k])
 		}
+		if v, ok := m.builder.Get(k); !ok {
+			return fmt.Errorf("builder key not found: %d", k)
+		} else if v != m.std[k] {
+			return fmt.Errorf("builder key (%d) mismatch: immutable=%d, std=%d", k, v, m.std[k])
+		}
+	}
+
+	if got, exp := m.builder.Len(), len(m.std); got != exp {
+		return fmt.Errorf("SortedMapBuilder.Len()=%d, expected %d", got, exp)
 	}
 
 	sort.Ints(m.keys)
-	if err := m.validateForwardIterator(); err != nil {
-		return err
-	} else if err := m.validateBackwardIterator(); err != nil {
-		return err
+	if err := m.validateForwardIterator(m.im); err != nil {
+		return fmt.Errorf("basic: %s", err)
+	} else if err := m.validateBackwardIterator(m.im); err != nil {
+		return fmt.Errorf("basic: %s", err)
+	}
+
+	if err := m.validateForwardIterator(m.builder.Map()); err != nil {
+		return fmt.Errorf("basic: %s", err)
+	} else if err := m.validateBackwardIterator(m.builder.Map()); err != nil {
+		return fmt.Errorf("basic: %s", err)
 	}
 	return nil
 }
 
-func (m *TestSortedMap) validateForwardIterator() error {
-	itr := m.im.Iterator()
+func (m *TSortedMap) validateForwardIterator(mm *SortedMap) error {
+	itr := mm.Iterator()
 	for i, k0 := range m.keys {
 		v0 := m.std[k0]
 		if k1, v1 := itr.Next(); k0 != k1 || v0 != v1 {
@@ -2148,8 +2177,8 @@ func (m *TestSortedMap) validateForwardIterator() error {
 	return nil
 }
 
-func (m *TestSortedMap) validateBackwardIterator() error {
-	itr := m.im.Iterator()
+func (m *TSortedMap) validateBackwardIterator(mm *SortedMap) error {
+	itr := mm.Iterator()
 	itr.Last()
 	for i := len(m.keys) - 1; i >= 0; i-- {
 		k0 := m.keys[i]
@@ -2222,6 +2251,29 @@ func BenchmarkSortedMap_Iterator(b *testing.B) {
 	})
 }
 
+func BenchmarkSortedMapBuilder_Set(b *testing.B) {
+	b.ReportAllocs()
+	builder := NewSortedMapBuilder(NewSortedMap(nil))
+	for i := 0; i < b.N; i++ {
+		builder.Set(i, i)
+	}
+}
+
+func BenchmarkSortedMapBuilder_Delete(b *testing.B) {
+	const n = 1000000
+
+	builder := NewSortedMapBuilder(NewSortedMap(nil))
+	for i := 0; i < n; i++ {
+		builder.Set(i, i)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		builder.Delete(i % n)
+	}
+}
+
 func ExampleSortedMap_Set() {
 	m := NewSortedMap(nil)
 	m = m.Set("foo", "bar")
@@ -2284,6 +2336,43 @@ func ExampleSortedMap_Iterator() {
 	// pear 700
 	// pineapple 800
 	// strawberry 900
+}
+
+func ExampleSortedMapBuilder_Set() {
+	b := NewSortedMapBuilder(NewSortedMap(nil))
+	b.Set("foo", "bar")
+	b.Set("baz", 100)
+
+	m := b.Map()
+	v, ok := m.Get("foo")
+	fmt.Println("foo", v, ok)
+
+	v, ok = m.Get("baz")
+	fmt.Println("baz", v, ok)
+
+	v, ok = m.Get("bat") // does not exist
+	fmt.Println("bat", v, ok)
+	// Output:
+	// foo bar true
+	// baz 100 true
+	// bat <nil> false
+}
+
+func ExampleSortedMapBuilder_Delete() {
+	b := NewSortedMapBuilder(NewSortedMap(nil))
+	b.Set("foo", "bar")
+	b.Set("baz", 100)
+	b.Delete("baz")
+
+	m := b.Map()
+	v, ok := m.Get("foo")
+	fmt.Println("foo", v, ok)
+
+	v, ok = m.Get("baz")
+	fmt.Println("baz", v, ok)
+	// Output:
+	// foo bar true
+	// baz <nil> false
 }
 
 // RunRandom executes fn multiple times with a different rand.
