@@ -249,7 +249,7 @@ type Hasher interface {
 }
 ```
 
-Please see the `IntHasher`, `StringHasher`, or `ByteSliceHasher` for examples.
+Please see the internal `intHasher`, `stringHasher`, and `byteSliceHasher` for examples.
 
 
 ## Sorted Map
@@ -283,7 +283,7 @@ type Comparer interface {
 }
 ```
 
-Please see the `IntComparer`, `StringComparer`, or `ByteSliceComparer` for examples.
+Please see the internal `intComparer`, `stringComparer`, and `byteSliceComparer` for examples.
 
 
 
