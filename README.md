@@ -1,4 +1,28 @@
-Immutable ![release](https://img.shields.io/github/release/benbjohnson/immutable.svg?style=flat-square) ![CircleCI](https://img.shields.io/circleci/project/github/benbjohnson/immutable/master.svg?style=flat-square) ![coverage](https://img.shields.io/codecov/c/github/benbjohnson/immutable/master.svg?style=flat-square) ![license](https://img.shields.io/github/license/benbjohnson/immutable.svg?style=flat-square)
+
+Modification Notes
+==================
+
+This repository is a minor modification of 
+[Ben Johnson's Immutable Repository](https://github.com/benbjohnson/immutable). 
+Ben's version automatically chooses a predefined hasher when keys have type
+`int`, `string`, or `[]byte`. However, it will *not* automatically choose a hasher 
+if keys have custom types based on those types, as in the following example: 
+
+```go
+type UserName int
+m := immutable.NewMap(nil)
+m = m.Set(UserName("jane"), 100)
+m = m.Set(UserName("susy"), 200)
+m = m.Set(UserName("jane"), 300)
+```
+
+This modified version uses reflection to determine the *kind* of the key types 
+and automatically assigns a hasher on that basis. As a result, the example above 
+works without the need to define a custom hasher for the `UserName` type.
+
+Ben's original README appears below, unmodified:
+
+Immutable
 =========
 
 This repository contains immutable collection types for Go. It includes
