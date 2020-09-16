@@ -45,6 +45,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/bits"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -721,13 +722,17 @@ func (m *Map) set(key, value interface{}, mutable bool) *Map {
 	// Set a hasher on the first value if one does not already exist.
 	hasher := m.hasher
 	if hasher == nil {
-		switch key.(type) {
-		case int:
+		switch theType := reflect.TypeOf(key); theType.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			hasher = &intHasher{}
-		case string:
+		case reflect.String:
 			hasher = &stringHasher{}
-		case []byte:
-			hasher = &byteSliceHasher{}
+		case reflect.Slice:
+			if theType.Elem().Kind() == reflect.Uint8 {
+				hasher = &byteSliceHasher{}
+			} else {
+				panic(fmt.Sprintf("immutable.Map.Set: must set hasher for %T type", key))
+			}
 		default:
 			panic(fmt.Sprintf("immutable.Map.Set: must set hasher for %T type", key))
 		}
@@ -2210,13 +2215,16 @@ type intHasher struct{}
 
 // Hash returns a hash for key.
 func (h *intHasher) Hash(key interface{}) uint32 {
-	return hashUint64(uint64(key.(int)))
+	keyInt := reflect.ValueOf(key).Int()
+	return hashUint64(uint64(keyInt))
 }
 
 // Equal returns true if a is equal to b. Otherwise returns false.
 // Panics if a and b are not ints.
 func (h *intHasher) Equal(a, b interface{}) bool {
-	return a.(int) == b.(int)
+	aInt := reflect.ValueOf(a).Int()
+	bInt := reflect.ValueOf(b).Int()
+	return aInt == bInt
 }
 
 // stringHasher implements Hasher for string keys.
@@ -2225,8 +2233,9 @@ type stringHasher struct{}
 // Hash returns a hash for value.
 func (h *stringHasher) Hash(value interface{}) uint32 {
 	var hash uint32
-	for i, value := 0, value.(string); i < len(value); i++ {
-		hash = 31*hash + uint32(value[i])
+	valueStr := reflect.ValueOf(value).String()
+	for i := 0; i < len(valueStr); i++ {
+		hash = 31*hash + uint32(valueStr[i])
 	}
 	return hash
 }
@@ -2234,7 +2243,9 @@ func (h *stringHasher) Hash(value interface{}) uint32 {
 // Equal returns true if a is equal to b. Otherwise returns false.
 // Panics if a and b are not strings.
 func (h *stringHasher) Equal(a, b interface{}) bool {
-	return a.(string) == b.(string)
+	aStr := reflect.ValueOf(a).String()
+	bStr := reflect.ValueOf(b).String()
+	return aStr == bStr
 }
 
 // byteSliceHasher implements Hasher for string keys.
