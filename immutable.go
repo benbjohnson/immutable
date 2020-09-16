@@ -45,6 +45,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/bits"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -721,16 +722,7 @@ func (m *Map) set(key, value interface{}, mutable bool) *Map {
 	// Set a hasher on the first value if one does not already exist.
 	hasher := m.hasher
 	if hasher == nil {
-		switch key.(type) {
-		case int:
-			hasher = &intHasher{}
-		case string:
-			hasher = &stringHasher{}
-		case []byte:
-			hasher = &byteSliceHasher{}
-		default:
-			panic(fmt.Sprintf("immutable.Map.Set: must set hasher for %T type", key))
-		}
+		hasher = NewHasher(key)
 	}
 
 	// Generate copy if necessary.
@@ -1589,16 +1581,7 @@ func (m *SortedMap) set(key, value interface{}, mutable bool) *SortedMap {
 	// Set a comparer on the first value if one does not already exist.
 	comparer := m.comparer
 	if comparer == nil {
-		switch key.(type) {
-		case int:
-			comparer = &intComparer{}
-		case string:
-			comparer = &stringComparer{}
-		case []byte:
-			comparer = &byteSliceComparer{}
-		default:
-			panic(fmt.Sprintf("immutable.SortedMap.Set: must set comparer for %T type", key))
-		}
+		comparer = NewComparer(key)
 	}
 
 	// Create copy, if necessary.
@@ -2205,6 +2188,52 @@ type Hasher interface {
 	Equal(a, b interface{}) bool
 }
 
+// NewHasher returns the built-in hasher for a given key type.
+func NewHasher(key interface{}) Hasher {
+	// Attempt to use non-reflection based hasher first.
+	switch key.(type) {
+	case int:
+		return &intHasher{}
+	case int8:
+		return &int8Hasher{}
+	case int16:
+		return &int16Hasher{}
+	case int32:
+		return &int32Hasher{}
+	case int64:
+		return &int64Hasher{}
+	case uint:
+		return &uintHasher{}
+	case uint8:
+		return &uint8Hasher{}
+	case uint16:
+		return &uint16Hasher{}
+	case uint32:
+		return &uint32Hasher{}
+	case uint64:
+		return &uint64Hasher{}
+	case string:
+		return &stringHasher{}
+	case []byte:
+		return &byteSliceHasher{}
+	}
+
+	// Fallback to reflection-based hasher otherwise.
+	// This is used when caller wraps a type around a primitive type.
+	switch reflect.TypeOf(key).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return &reflectIntHasher{}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return &reflectUintHasher{}
+	case reflect.String:
+		return &reflectStringHasher{}
+	}
+
+	// If no hashers match then panic.
+	// This is a compile time issue so it should not return an error.
+	panic(fmt.Sprintf("immutable.NewHasher: must set hasher for %T type", key))
+}
+
 // intHasher implements Hasher for int keys.
 type intHasher struct{}
 
@@ -2217,6 +2246,132 @@ func (h *intHasher) Hash(key interface{}) uint32 {
 // Panics if a and b are not ints.
 func (h *intHasher) Equal(a, b interface{}) bool {
 	return a.(int) == b.(int)
+}
+
+// int8Hasher implements Hasher for int8 keys.
+type int8Hasher struct{}
+
+// Hash returns a hash for key.
+func (h *int8Hasher) Hash(key interface{}) uint32 {
+	return hashUint64(uint64(key.(int8)))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not int8s.
+func (h *int8Hasher) Equal(a, b interface{}) bool {
+	return a.(int8) == b.(int8)
+}
+
+// int16Hasher implements Hasher for int16 keys.
+type int16Hasher struct{}
+
+// Hash returns a hash for key.
+func (h *int16Hasher) Hash(key interface{}) uint32 {
+	return hashUint64(uint64(key.(int16)))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not int16s.
+func (h *int16Hasher) Equal(a, b interface{}) bool {
+	return a.(int16) == b.(int16)
+}
+
+// int32Hasher implements Hasher for int32 keys.
+type int32Hasher struct{}
+
+// Hash returns a hash for key.
+func (h *int32Hasher) Hash(key interface{}) uint32 {
+	return hashUint64(uint64(key.(int32)))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not int32s.
+func (h *int32Hasher) Equal(a, b interface{}) bool {
+	return a.(int32) == b.(int32)
+}
+
+// int64Hasher implements Hasher for int64 keys.
+type int64Hasher struct{}
+
+// Hash returns a hash for key.
+func (h *int64Hasher) Hash(key interface{}) uint32 {
+	return hashUint64(uint64(key.(int64)))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not int64s.
+func (h *int64Hasher) Equal(a, b interface{}) bool {
+	return a.(int64) == b.(int64)
+}
+
+// uintHasher implements Hasher for uint keys.
+type uintHasher struct{}
+
+// Hash returns a hash for key.
+func (h *uintHasher) Hash(key interface{}) uint32 {
+	return hashUint64(uint64(key.(uint)))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not uints.
+func (h *uintHasher) Equal(a, b interface{}) bool {
+	return a.(uint) == b.(uint)
+}
+
+// uint8Hasher implements Hasher for uint8 keys.
+type uint8Hasher struct{}
+
+// Hash returns a hash for key.
+func (h *uint8Hasher) Hash(key interface{}) uint32 {
+	return hashUint64(uint64(key.(uint8)))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not uint8s.
+func (h *uint8Hasher) Equal(a, b interface{}) bool {
+	return a.(uint8) == b.(uint8)
+}
+
+// uint16Hasher implements Hasher for uint16 keys.
+type uint16Hasher struct{}
+
+// Hash returns a hash for key.
+func (h *uint16Hasher) Hash(key interface{}) uint32 {
+	return hashUint64(uint64(key.(uint16)))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not uint16s.
+func (h *uint16Hasher) Equal(a, b interface{}) bool {
+	return a.(uint16) == b.(uint16)
+}
+
+// uint32Hasher implements Hasher for uint32 keys.
+type uint32Hasher struct{}
+
+// Hash returns a hash for key.
+func (h *uint32Hasher) Hash(key interface{}) uint32 {
+	return hashUint64(uint64(key.(uint32)))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not uint32s.
+func (h *uint32Hasher) Equal(a, b interface{}) bool {
+	return a.(uint32) == b.(uint32)
+}
+
+// uint64Hasher implements Hasher for uint64 keys.
+type uint64Hasher struct{}
+
+// Hash returns a hash for key.
+func (h *uint64Hasher) Hash(key interface{}) uint32 {
+	return hashUint64(key.(uint64))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not uint64s.
+func (h *uint64Hasher) Equal(a, b interface{}) bool {
+	return a.(uint64) == b.(uint64)
 }
 
 // stringHasher implements Hasher for string keys.
@@ -2237,7 +2392,7 @@ func (h *stringHasher) Equal(a, b interface{}) bool {
 	return a.(string) == b.(string)
 }
 
-// byteSliceHasher implements Hasher for string keys.
+// byteSliceHasher implements Hasher for byte slice keys.
 type byteSliceHasher struct{}
 
 // Hash returns a hash for value.
@@ -2253,6 +2408,53 @@ func (h *byteSliceHasher) Hash(value interface{}) uint32 {
 // Panics if a and b are not byte slices.
 func (h *byteSliceHasher) Equal(a, b interface{}) bool {
 	return bytes.Equal(a.([]byte), b.([]byte))
+}
+
+// reflectIntHasher implements a reflection-based Hasher for int keys.
+type reflectIntHasher struct{}
+
+// Hash returns a hash for key.
+func (h *reflectIntHasher) Hash(key interface{}) uint32 {
+	return hashUint64(uint64(reflect.ValueOf(key).Int()))
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not ints.
+func (h *reflectIntHasher) Equal(a, b interface{}) bool {
+	return reflect.ValueOf(a).Int() == reflect.ValueOf(b).Int()
+}
+
+// reflectUintHasher implements a reflection-based Hasher for uint keys.
+type reflectUintHasher struct{}
+
+// Hash returns a hash for key.
+func (h *reflectUintHasher) Hash(key interface{}) uint32 {
+	return hashUint64(reflect.ValueOf(key).Uint())
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not ints.
+func (h *reflectUintHasher) Equal(a, b interface{}) bool {
+	return reflect.ValueOf(a).Uint() == reflect.ValueOf(b).Uint()
+}
+
+// reflectStringHasher implements a refletion-based Hasher for string keys.
+type reflectStringHasher struct{}
+
+// Hash returns a hash for value.
+func (h *reflectStringHasher) Hash(value interface{}) uint32 {
+	var hash uint32
+	s := reflect.ValueOf(value).String()
+	for i := 0; i < len(s); i++ {
+		hash = 31*hash + uint32(s[i])
+	}
+	return hash
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not strings.
+func (h *reflectStringHasher) Equal(a, b interface{}) bool {
+	return reflect.ValueOf(a).String() == reflect.ValueOf(b).String()
 }
 
 // hashUint64 returns a 32-bit hash for a 64-bit value.
@@ -2272,6 +2474,52 @@ type Comparer interface {
 	Compare(a, b interface{}) int
 }
 
+// NewComparer returns the built-in comparer for a given key type.
+func NewComparer(key interface{}) Comparer {
+	// Attempt to use non-reflection based comparer first.
+	switch key.(type) {
+	case int:
+		return &intComparer{}
+	case int8:
+		return &int8Comparer{}
+	case int16:
+		return &int16Comparer{}
+	case int32:
+		return &int32Comparer{}
+	case int64:
+		return &int64Comparer{}
+	case uint:
+		return &uintComparer{}
+	case uint8:
+		return &uint8Comparer{}
+	case uint16:
+		return &uint16Comparer{}
+	case uint32:
+		return &uint32Comparer{}
+	case uint64:
+		return &uint64Comparer{}
+	case string:
+		return &stringComparer{}
+	case []byte:
+		return &byteSliceComparer{}
+	}
+
+	// Fallback to reflection-based comparer otherwise.
+	// This is used when caller wraps a type around a primitive type.
+	switch reflect.TypeOf(key).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return &reflectIntComparer{}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return &reflectUintComparer{}
+	case reflect.String:
+		return &reflectStringComparer{}
+	}
+
+	// If no comparers match then panic.
+	// This is a compile time issue so it should not return an error.
+	panic(fmt.Sprintf("immutable.NewComparer: must set comparer for %T type", key))
+}
+
 // intComparer compares two integers. Implements Comparer.
 type intComparer struct{}
 
@@ -2279,6 +2527,132 @@ type intComparer struct{}
 // returns 0 if a is equal to b. Panic if a or b is not an int.
 func (c *intComparer) Compare(a, b interface{}) int {
 	if i, j := a.(int), b.(int); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// int8Comparer compares two int8 values. Implements Comparer.
+type int8Comparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an int8.
+func (c *int8Comparer) Compare(a, b interface{}) int {
+	if i, j := a.(int8), b.(int8); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// int16Comparer compares two int16 values. Implements Comparer.
+type int16Comparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an int16.
+func (c *int16Comparer) Compare(a, b interface{}) int {
+	if i, j := a.(int16), b.(int16); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// int32Comparer compares two int32 values. Implements Comparer.
+type int32Comparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an int32.
+func (c *int32Comparer) Compare(a, b interface{}) int {
+	if i, j := a.(int32), b.(int32); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// int64Comparer compares two int64 values. Implements Comparer.
+type int64Comparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an int64.
+func (c *int64Comparer) Compare(a, b interface{}) int {
+	if i, j := a.(int64), b.(int64); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// uintComparer compares two uint values. Implements Comparer.
+type uintComparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an uint.
+func (c *uintComparer) Compare(a, b interface{}) int {
+	if i, j := a.(uint), b.(uint); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// uint8Comparer compares two uint8 values. Implements Comparer.
+type uint8Comparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an uint8.
+func (c *uint8Comparer) Compare(a, b interface{}) int {
+	if i, j := a.(uint8), b.(uint8); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// uint16Comparer compares two uint16 values. Implements Comparer.
+type uint16Comparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an uint16.
+func (c *uint16Comparer) Compare(a, b interface{}) int {
+	if i, j := a.(uint16), b.(uint16); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// uint32Comparer compares two uint32 values. Implements Comparer.
+type uint32Comparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an uint32.
+func (c *uint32Comparer) Compare(a, b interface{}) int {
+	if i, j := a.(uint32), b.(uint32); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// uint64Comparer compares two uint64 values. Implements Comparer.
+type uint64Comparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an uint64.
+func (c *uint64Comparer) Compare(a, b interface{}) int {
+	if i, j := a.(uint64), b.(uint64); i < j {
 		return -1
 	} else if i > j {
 		return 1
@@ -2302,4 +2676,41 @@ type byteSliceComparer struct{}
 // returns 0 if a is equal to b. Panic if a or b is not a byte slice.
 func (c *byteSliceComparer) Compare(a, b interface{}) int {
 	return bytes.Compare(a.([]byte), b.([]byte))
+}
+
+// reflectIntComparer compares two int values using reflection. Implements Comparer.
+type reflectIntComparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an int.
+func (c *reflectIntComparer) Compare(a, b interface{}) int {
+	if i, j := reflect.ValueOf(a).Int(), reflect.ValueOf(b).Int(); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// reflectUintComparer compares two uint values using reflection. Implements Comparer.
+type reflectUintComparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an int.
+func (c *reflectUintComparer) Compare(a, b interface{}) int {
+	if i, j := reflect.ValueOf(a).Uint(), reflect.ValueOf(b).Uint(); i < j {
+		return -1
+	} else if i > j {
+		return 1
+	}
+	return 0
+}
+
+// reflectStringComparer compares two string values using reflection. Implements Comparer.
+type reflectStringComparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an int.
+func (c *reflectStringComparer) Compare(a, b interface{}) int {
+	return strings.Compare(reflect.ValueOf(a).String(), reflect.ValueOf(b).String())
 }
