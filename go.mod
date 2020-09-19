@@ -1,3 +1,3 @@
-module github.com/benbjohnson/immutable
+module github.com/adrianboyko/immutable
 
 go 1.12
