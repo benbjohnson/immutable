@@ -1010,13 +1010,14 @@ func TestMap_Set(t *testing.T) {
 	})
 
 	t.Run("NoDefaultHasher", func(t *testing.T) {
+		type T struct{}
 		var r string
 		func() {
 			defer func() { r = recover().(string) }()
 			m := NewMap(nil)
-			m = m.Set(uint64(100), "bar")
+			m = m.Set(T{}, "bar")
 		}()
-		if r != `immutable.Map.Set: must set hasher for uint64 type` {
+		if r != `immutable.NewHasher: must set hasher for immutable.T type` {
 			t.Fatalf("unexpected panic: %q", r)
 		}
 	})
@@ -1039,6 +1040,10 @@ func TestMap_Set(t *testing.T) {
 
 // Ensure map can support overwrites as it expands.
 func TestMap_Overwrite(t *testing.T) {
+	if testing.Short() {
+		t.Skip("short mode")
+	}
+
 	const n = 10000
 	m := NewMap(nil)
 	for i := 0; i < n; i++ {
@@ -1140,6 +1145,10 @@ func TestMap_Delete(t *testing.T) {
 
 // Ensure map works even with hash conflicts.
 func TestMap_LimitedHash(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping: short")
+	}
+
 	t.Run("Immutable", func(t *testing.T) {
 		h := mockHasher{
 			hash:  func(value interface{}) uint32 { return hashUint64(uint64(value.(int))) % 0xFF },
@@ -1837,9 +1846,9 @@ func TestSortedMap_Set(t *testing.T) {
 		func() {
 			defer func() { r = recover().(string) }()
 			m := NewSortedMap(nil)
-			m = m.Set(uint64(100), "bar")
+			m = m.Set(float64(100), "bar")
 		}()
-		if r != `immutable.SortedMap.Set: must set comparer for uint64 type` {
+		if r != `immutable.NewComparer: must set comparer for float64 type` {
 			t.Fatalf("unexpected panic: %q", r)
 		}
 	})
@@ -2067,6 +2076,87 @@ func TestSortedMap_Iterator(t *testing.T) {
 			}
 		})
 	})
+}
+
+func TestNewHasher(t *testing.T) {
+	t.Run("builtin", func(t *testing.T) {
+		t.Run("int", func(t *testing.T) { testNewHasher(t, int(100)) })
+		t.Run("int8", func(t *testing.T) { testNewHasher(t, int8(100)) })
+		t.Run("int16", func(t *testing.T) { testNewHasher(t, int16(100)) })
+		t.Run("int32", func(t *testing.T) { testNewHasher(t, int32(100)) })
+		t.Run("int64", func(t *testing.T) { testNewHasher(t, int64(100)) })
+
+		t.Run("uint", func(t *testing.T) { testNewHasher(t, uint(100)) })
+		t.Run("uint8", func(t *testing.T) { testNewHasher(t, uint8(100)) })
+		t.Run("uint16", func(t *testing.T) { testNewHasher(t, uint16(100)) })
+		t.Run("uint32", func(t *testing.T) { testNewHasher(t, uint32(100)) })
+		t.Run("uint64", func(t *testing.T) { testNewHasher(t, uint64(100)) })
+
+		t.Run("string", func(t *testing.T) { testNewHasher(t, "foo") })
+		t.Run("byteSlice", func(t *testing.T) { testNewHasher(t, []byte("foo")) })
+	})
+
+	t.Run("reflection", func(t *testing.T) {
+		type Int int
+		t.Run("int", func(t *testing.T) { testNewHasher(t, Int(100)) })
+
+		type Uint uint
+		t.Run("uint", func(t *testing.T) { testNewHasher(t, Uint(100)) })
+
+		type String string
+		t.Run("string", func(t *testing.T) { testNewHasher(t, String("foo")) })
+	})
+}
+
+func testNewHasher(t *testing.T, v interface{}) {
+	t.Helper()
+	h := NewHasher(v)
+	h.Hash(v)
+	if !h.Equal(v, v) {
+		t.Fatal("expected hash equality")
+	}
+}
+
+func TestNewComparer(t *testing.T) {
+	t.Run("builtin", func(t *testing.T) {
+		t.Run("int", func(t *testing.T) { testNewComparer(t, int(100), int(101)) })
+		t.Run("int8", func(t *testing.T) { testNewComparer(t, int8(100), int8(101)) })
+		t.Run("int16", func(t *testing.T) { testNewComparer(t, int16(100), int16(101)) })
+		t.Run("int32", func(t *testing.T) { testNewComparer(t, int32(100), int32(101)) })
+		t.Run("int64", func(t *testing.T) { testNewComparer(t, int64(100), int64(101)) })
+
+		t.Run("uint", func(t *testing.T) { testNewComparer(t, uint(100), uint(101)) })
+		t.Run("uint8", func(t *testing.T) { testNewComparer(t, uint8(100), uint8(101)) })
+		t.Run("uint16", func(t *testing.T) { testNewComparer(t, uint16(100), uint16(101)) })
+		t.Run("uint32", func(t *testing.T) { testNewComparer(t, uint32(100), uint32(101)) })
+		t.Run("uint64", func(t *testing.T) { testNewComparer(t, uint64(100), uint64(101)) })
+
+		t.Run("string", func(t *testing.T) { testNewComparer(t, "bar", "foo") })
+		t.Run("byteSlice", func(t *testing.T) { testNewComparer(t, []byte("bar"), []byte("foo")) })
+	})
+
+	t.Run("reflection", func(t *testing.T) {
+		type Int int
+		t.Run("int", func(t *testing.T) { testNewComparer(t, Int(100), Int(101)) })
+
+		type Uint uint
+		t.Run("uint", func(t *testing.T) { testNewComparer(t, Uint(100), Uint(101)) })
+
+		type String string
+		t.Run("string", func(t *testing.T) { testNewComparer(t, String("bar"), String("foo")) })
+	})
+}
+
+func testNewComparer(t *testing.T, x, y interface{}) {
+	t.Helper()
+	c := NewComparer(x)
+	if c.Compare(x, y) != -1 {
+		t.Fatal("expected comparer LT")
+	} else if c.Compare(x, x) != 0 {
+		t.Fatal("expected comparer EQ")
+	} else if c.Compare(y, x) != 1 {
+		t.Fatal("expected comparer GT")
+	}
 }
 
 // TSortedMap represents a combined immutable and stdlib sorted map.
