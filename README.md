@@ -136,8 +136,9 @@ is implemented to act similarly to the built-in Go `map` type. It is implemented
 as a [Hash-Array Mapped Trie](https://lampwww.epfl.ch/papers/idealhashtrees.pdf).
 
 Maps require a `Hasher` to hash keys and check for equality. There are built-in
-hasher implementations for `int`, `string`, and `[]byte` keys. You may pass in
-a `nil` hasher to `NewMap()` if you are using one of these key types.
+hasher implementations for most primitive types such as `int`, `uint`, `string`,
+and `[]byte` keys. You may pass in a `nil` hasher to `NewMap()` if you are using
+one of these key types.
 
 
 ### Setting map key/value pairs
@@ -235,9 +236,9 @@ also build on top of existing maps too.
 
 ### Implementing a custom Hasher
 
-If you need to use a key type besides `int`, `string`, or `[]byte` then you'll
-need to create a custom `Hasher` implementation and pass it to `NewMap()` on
-creation.
+If you need to use a key type besides `int`, `uint`, `string`, or `[]byte` then
+you'll need to create a custom `Hasher` implementation and pass it to `NewMap()`
+on creation.
 
 Hashers are fairly simple. They only need to generate hashes for a given key
 and check equality given two keys.
@@ -249,7 +250,8 @@ type Hasher interface {
 }
 ```
 
-Please see the internal `intHasher`, `stringHasher`, and `byteSliceHasher` for examples.
+Please see the internal `intHasher`, `uintHasher`, `stringHasher`, and
+`byteSliceHasher` for examples.
 
 
 ## Sorted Map
@@ -259,9 +261,9 @@ Unlike the `Map`, however, keys can be iterated over in-order. It is implemented
 as a B+tree.
 
 Sorted maps require a `Comparer` to sort keys and check for equality. There are
-built-in comparer implementations for `int`, `string`, and `[]byte` keys. You 
-may pass a `nil` comparer to `NewSortedMap()` if you are using one of these key
-types.
+built-in comparer implementations for `int`, `uint`, `string`, and `[]byte` keys.
+You may pass a `nil` comparer to `NewSortedMap()` if you are using one of these
+key types.
 
 The API is identical to the `Map` implementation. The sorted map also has a
 companion `SortedMapBuilder` for more efficiently building maps.
@@ -269,8 +271,8 @@ companion `SortedMapBuilder` for more efficiently building maps.
 
 ### Implementing a custom Comparer
 
-If you need to use a key type besides `int`, `string`, or `[]byte` then you'll
-need to create a custom `Comparer` implementation and pass it to
+If you need to use a key type besides `int`, `uint`, `string`, or `[]byte`
+then you'll need to create a custom `Comparer` implementation and pass it to
 `NewSortedMap()` on creation.
 
 Comparers on have one method—`Compare()`. It works the same as the
@@ -283,7 +285,8 @@ type Comparer interface {
 }
 ```
 
-Please see the internal `intComparer`, `stringComparer`, and `byteSliceComparer` for examples.
+Please see the internal `intComparer`, `uintComparer`, `stringComparer`, and
+`byteSliceComparer` for examples.
 
 
 
