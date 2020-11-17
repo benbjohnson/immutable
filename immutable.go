@@ -224,37 +224,35 @@ func (l *List) Iterator() *ListIterator {
 	return itr
 }
 
-// ListBuilder represents an efficient builder for creating Lists.
-//
-// Lists returned from the builder are safe to use even after you continue to
-// use the builder. However, for efficiency, you should only retrieve your list
-// after you have completed building it.
+// ListBuilder represents an efficient builder for creating new Lists.
 type ListBuilder struct {
-	list    *List // current state
-	mutable bool  // if true, next mutation will operate in-place.
+	list *List // current state
 }
 
-// NewListBuilder returns a new instance of ListBuilder to build on a base list.
-func NewListBuilder(list *List) *ListBuilder {
-	return &ListBuilder{list: list}
+// NewListBuilder returns a new instance of ListBuilder.
+func NewListBuilder() *ListBuilder {
+	return &ListBuilder{list: NewList()}
 }
 
 // List returns the current copy of the list.
-// The returned list is safe to use even if after the builder continues to be used.
+// The builder should not be used again after the list after this call.
 func (b *ListBuilder) List() *List {
+	assert(b.list != nil, "immutable.ListBuilder.List(): duplicate call to fetch list")
 	list := b.list
-	b.mutable = false
+	b.list = nil
 	return list
 }
 
 // Len returns the number of elements in the underlying list.
 func (b *ListBuilder) Len() int {
+	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
 	return b.list.Len()
 }
 
 // Get returns the value at the given index. Similar to slices, this method will
 // panic if index is below zero or is greater than or equal to the list size.
 func (b *ListBuilder) Get(index int) interface{} {
+	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
 	return b.list.Get(index)
 }
 
@@ -262,27 +260,33 @@ func (b *ListBuilder) Get(index int) interface{} {
 // panic if index is below zero or if the index is greater than or equal to the
 // list size.
 func (b *ListBuilder) Set(index int, value interface{}) {
-	b.list = b.list.set(index, value, b.mutable)
-	b.mutable = true
+	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
+	b.list = b.list.set(index, value, true)
 }
 
 // Append adds value to the end of the list.
 func (b *ListBuilder) Append(value interface{}) {
-	b.list = b.list.append(value, b.mutable)
-	b.mutable = true
+	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
+	b.list = b.list.append(value, true)
 }
 
 // Prepend adds value to the beginning of the list.
 func (b *ListBuilder) Prepend(value interface{}) {
-	b.list = b.list.prepend(value, b.mutable)
-	b.mutable = true
+	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
+	b.list = b.list.prepend(value, true)
 }
 
 // Slice updates the list with a sublist of elements between start and end index.
 // See List.Slice() for more details.
 func (b *ListBuilder) Slice(start, end int) {
-	b.list = b.list.slice(start, end, b.mutable)
-	b.mutable = true
+	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
+	b.list = b.list.slice(start, end, true)
+}
+
+// Iterator returns a new iterator for the underlying list.
+func (b *ListBuilder) Iterator() *ListIterator {
+	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
+	return b.list.Iterator()
 }
 
 // Constants for bit shifts used for levels in the List trie.
@@ -788,48 +792,52 @@ func (m *Map) Iterator() *MapIterator {
 }
 
 // MapBuilder represents an efficient builder for creating Maps.
-//
-// Maps returned from the builder are safe to use even after you continue to
-// use the builder. However, for efficiency, you should only retrieve your map
-// after you have completed building it.
 type MapBuilder struct {
-	m       *Map // current state
-	mutable bool // if true, next mutation will operate in-place.
+	m *Map // current state
 }
 
-// NewMapBuilder returns a new instance of MapBuilder to build on a base map.
-func NewMapBuilder(m *Map) *MapBuilder {
-	return &MapBuilder{m: m}
+// NewMapBuilder returns a new instance of MapBuilder.
+func NewMapBuilder(hasher Hasher) *MapBuilder {
+	return &MapBuilder{m: NewMap(hasher)}
 }
 
-// Map returns the current copy of the map.
-// The returned map is safe to use even if after the builder continues to be used.
+// Map returns the underlying map. Only call once.
+// Builder is invalid after call. Will panic on second invocation.
 func (b *MapBuilder) Map() *Map {
+	assert(b.m != nil, "immutable.SortedMapBuilder.Map(): duplicate call to fetch map")
 	m := b.m
-	b.mutable = false
+	b.m = nil
 	return m
 }
 
 // Len returns the number of elements in the underlying map.
 func (b *MapBuilder) Len() int {
+	assert(b.m != nil, "immutable.MapBuilder: builder invalid after Map() invocation")
 	return b.m.Len()
 }
 
 // Get returns the value for the given key.
 func (b *MapBuilder) Get(key interface{}) (value interface{}, ok bool) {
+	assert(b.m != nil, "immutable.MapBuilder: builder invalid after Map() invocation")
 	return b.m.Get(key)
 }
 
 // Set sets the value of the given key. See Map.Set() for additional details.
 func (b *MapBuilder) Set(key, value interface{}) {
-	b.m = b.m.set(key, value, b.mutable)
-	b.mutable = true
+	assert(b.m != nil, "immutable.MapBuilder: builder invalid after Map() invocation")
+	b.m = b.m.set(key, value, true)
 }
 
 // Delete removes the given key. See Map.Delete() for additional details.
 func (b *MapBuilder) Delete(key interface{}) {
-	b.m = b.m.delete(key, b.mutable)
-	b.mutable = true
+	assert(b.m != nil, "immutable.MapBuilder: builder invalid after Map() invocation")
+	b.m = b.m.delete(key, true)
+}
+
+// Iterator returns a new iterator for the underlying map.
+func (b *MapBuilder) Iterator() *MapIterator {
+	assert(b.m != nil, "immutable.MapBuilder: builder invalid after Map() invocation")
+	return b.m.Iterator()
 }
 
 // mapNode represents any node in the map tree.
@@ -1660,48 +1668,52 @@ func (m *SortedMap) Iterator() *SortedMapIterator {
 }
 
 // SortedMapBuilder represents an efficient builder for creating sorted maps.
-//
-// Maps returned from the builder are safe to use even after you continue to
-// use the builder. However, for efficiency, you should only retrieve your map
-// after you have completed building it.
 type SortedMapBuilder struct {
-	m       *SortedMap // current state
-	mutable bool       // if true, next mutation will operate in-place.
+	m *SortedMap // current state
 }
 
-// NewSortedMapBuilder returns a new instance of SortedMapBuilder to build on a base map.
-func NewSortedMapBuilder(m *SortedMap) *SortedMapBuilder {
-	return &SortedMapBuilder{m: m}
+// NewSortedMapBuilder returns a new instance of SortedMapBuilder.
+func NewSortedMapBuilder(comparer Comparer) *SortedMapBuilder {
+	return &SortedMapBuilder{m: NewSortedMap(comparer)}
 }
 
 // SortedMap returns the current copy of the map.
 // The returned map is safe to use even if after the builder continues to be used.
 func (b *SortedMapBuilder) Map() *SortedMap {
+	assert(b.m != nil, "immutable.SortedMapBuilder.Map(): duplicate call to fetch map")
 	m := b.m
-	b.mutable = false
+	b.m = nil
 	return m
 }
 
 // Len returns the number of elements in the underlying map.
 func (b *SortedMapBuilder) Len() int {
+	assert(b.m != nil, "immutable.SortedMapBuilder: builder invalid after Map() invocation")
 	return b.m.Len()
 }
 
 // Get returns the value for the given key.
 func (b *SortedMapBuilder) Get(key interface{}) (value interface{}, ok bool) {
+	assert(b.m != nil, "immutable.SortedMapBuilder: builder invalid after Map() invocation")
 	return b.m.Get(key)
 }
 
 // Set sets the value of the given key. See SortedMap.Set() for additional details.
 func (b *SortedMapBuilder) Set(key, value interface{}) {
-	b.m = b.m.set(key, value, b.mutable)
-	b.mutable = true
+	assert(b.m != nil, "immutable.SortedMapBuilder: builder invalid after Map() invocation")
+	b.m = b.m.set(key, value, true)
 }
 
 // Delete removes the given key. See SortedMap.Delete() for additional details.
 func (b *SortedMapBuilder) Delete(key interface{}) {
-	b.m = b.m.delete(key, b.mutable)
-	b.mutable = true
+	assert(b.m != nil, "immutable.SortedMapBuilder: builder invalid after Map() invocation")
+	b.m = b.m.delete(key, true)
+}
+
+// Iterator returns a new iterator for the underlying map positioned at the first key.
+func (b *SortedMapBuilder) Iterator() *SortedMapIterator {
+	assert(b.m != nil, "immutable.SortedMapBuilder: builder invalid after Map() invocation")
+	return b.m.Iterator()
 }
 
 // sortedMapNode represents a branch or leaf node in the sorted map.
@@ -2713,4 +2725,10 @@ type reflectStringComparer struct{}
 // returns 0 if a is equal to b. Panic if a or b is not an int.
 func (c *reflectStringComparer) Compare(a, b interface{}) int {
 	return strings.Compare(reflect.ValueOf(a).String(), reflect.ValueOf(b).String())
+}
+
+func assert(condition bool, message string) {
+	if !condition {
+		panic(message)
+	}
 }

@@ -213,7 +213,7 @@ type TList struct {
 func NewTList() *TList {
 	return &TList{
 		im:      NewList(),
-		builder: NewListBuilder(NewList()),
+		builder: NewListBuilder(),
 	}
 }
 
@@ -280,33 +280,29 @@ func (l *TList) Validate() error {
 		return fmt.Errorf("Len()=%v, expected %d", got, exp)
 	}
 
-	bl := l.builder.List()
 	for i := range l.std {
 		if got, exp := l.im.Get(i), l.std[i]; got != exp {
 			return fmt.Errorf("Get(%d)=%v, expected %v", i, got, exp)
 		} else if got, exp := l.builder.Get(i), l.std[i]; got != exp {
-			return fmt.Errorf("Builder.Get(%d)=%v, expected %v", i, got, exp)
-		} else if got, exp := bl.Get(i), l.std[i]; got != exp {
 			return fmt.Errorf("Builder.List/Get(%d)=%v, expected %v", i, got, exp)
 		}
 	}
 
-	if err := l.validateForwardIterator("basic", l.im); err != nil {
+	if err := l.validateForwardIterator("basic", l.im.Iterator()); err != nil {
 		return err
-	} else if err := l.validateBackwardIterator("basic", l.im); err != nil {
+	} else if err := l.validateBackwardIterator("basic", l.im.Iterator()); err != nil {
 		return err
 	}
 
-	if err := l.validateForwardIterator("builder", bl); err != nil {
+	if err := l.validateForwardIterator("builder", l.builder.Iterator()); err != nil {
 		return err
-	} else if err := l.validateBackwardIterator("builder", bl); err != nil {
+	} else if err := l.validateBackwardIterator("builder", l.builder.Iterator()); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (l *TList) validateForwardIterator(typ string, list *List) error {
-	itr := list.Iterator()
+func (l *TList) validateForwardIterator(typ string, itr *ListIterator) error {
 	for i := range l.std {
 		if j, v := itr.Next(); i != j || l.std[i] != v {
 			return fmt.Errorf("ListIterator.Next()=<%v,%v>, expected <%v,%v> [%s]", j, v, i, l.std[i], typ)
@@ -323,8 +319,7 @@ func (l *TList) validateForwardIterator(typ string, list *List) error {
 	return nil
 }
 
-func (l *TList) validateBackwardIterator(typ string, list *List) error {
-	itr := list.Iterator()
+func (l *TList) validateBackwardIterator(typ string, itr *ListIterator) error {
 	itr.Last()
 	for i := len(l.std) - 1; i >= 0; i-- {
 		if j, v := itr.Prev(); i != j || l.std[i] != v {
@@ -422,7 +417,7 @@ func BenchmarkBuiltinSlice_Append(b *testing.B) {
 
 func BenchmarkListBuilder_Append(b *testing.B) {
 	b.ReportAllocs()
-	builder := NewListBuilder(NewList())
+	builder := NewListBuilder()
 	for i := 0; i < b.N; i++ {
 		builder.Append(i)
 	}
@@ -430,7 +425,7 @@ func BenchmarkListBuilder_Append(b *testing.B) {
 
 func BenchmarkListBuilder_Prepend(b *testing.B) {
 	b.ReportAllocs()
-	builder := NewListBuilder(NewList())
+	builder := NewListBuilder()
 	for i := 0; i < b.N; i++ {
 		builder.Prepend(i)
 	}
@@ -439,7 +434,7 @@ func BenchmarkListBuilder_Prepend(b *testing.B) {
 func BenchmarkListBuilder_Set(b *testing.B) {
 	const n = 10000
 
-	builder := NewListBuilder(NewList())
+	builder := NewListBuilder()
 	for i := 0; i < 10000; i++ {
 		builder.Append(i)
 	}
@@ -544,7 +539,7 @@ func ExampleList_Iterator_reverse() {
 }
 
 func ExampleListBuilder_Append() {
-	b := NewListBuilder(NewList())
+	b := NewListBuilder()
 	b.Append("foo")
 	b.Append("bar")
 	b.Append("baz")
@@ -560,7 +555,7 @@ func ExampleListBuilder_Append() {
 }
 
 func ExampleListBuilder_Prepend() {
-	b := NewListBuilder(NewList())
+	b := NewListBuilder()
 	b.Prepend("foo")
 	b.Prepend("bar")
 	b.Prepend("baz")
@@ -576,7 +571,7 @@ func ExampleListBuilder_Prepend() {
 }
 
 func ExampleListBuilder_Set() {
-	b := NewListBuilder(NewList())
+	b := NewListBuilder()
 	b.Append("foo")
 	b.Append("bar")
 	b.Set(1, "baz")
@@ -590,7 +585,7 @@ func ExampleListBuilder_Set() {
 }
 
 func ExampleListBuilder_Slice() {
-	b := NewListBuilder(NewList())
+	b := NewListBuilder()
 	b.Append("foo")
 	b.Append("bar")
 	b.Append("baz")
@@ -1126,9 +1121,6 @@ func TestMap_Delete(t *testing.T) {
 				m.Set(m.NewKey(rand), rand.Intn(10000))
 			}
 		}
-		if err := m.Validate(); err != nil {
-			t.Fatal(err)
-		}
 
 		// Delete all and verify they are gone.
 		keys := make([]int, len(m.keys))
@@ -1207,7 +1199,7 @@ func TestMap_LimitedHash(t *testing.T) {
 			hash:  func(value interface{}) uint32 { return hashUint64(uint64(value.(int))) % 0xFF },
 			equal: func(a, b interface{}) bool { return a.(int) == b.(int) },
 		}
-		b := NewMapBuilder(NewMap(&h))
+		b := NewMapBuilder(&h)
 
 		rand := rand.New(rand.NewSource(0))
 		keys := rand.Perm(100000)
@@ -1229,7 +1221,7 @@ func TestMap_LimitedHash(t *testing.T) {
 		}
 
 		// Verify iteration.
-		itr := b.Map().Iterator()
+		itr := b.Iterator()
 		for !itr.Done() {
 			if k, v := itr.Next(); v != k.(int)*2 {
 				t.Fatalf("MapIterator.Next()=<%v,%v>, expected value %v", k, v, k.(int)*2)
@@ -1239,12 +1231,6 @@ func TestMap_LimitedHash(t *testing.T) {
 		// Verify not found works.
 		if _, ok := b.Get(10000000); ok {
 			t.Fatal("expected no value")
-		}
-
-		// Verify delete non-existent key works.
-		m := b.Map()
-		if b.Delete(10000000 + 1); m != b.Map() {
-			t.Fatal("expected no change")
 		}
 
 		// Remove all keys.
@@ -1268,7 +1254,7 @@ type TMap struct {
 func NewTestMap() *TMap {
 	return &TMap{
 		im:      NewMap(nil),
-		builder: NewMapBuilder(NewMap(nil)),
+		builder: NewMapBuilder(nil),
 		std:     make(map[int]int),
 	}
 }
@@ -1328,17 +1314,16 @@ func (m *TMap) Validate() error {
 			return fmt.Errorf("builder key (%d) mismatch: immutable=%d, std=%d", k, v, m.std[k])
 		}
 	}
-	if err := m.validateIterator(m.im); err != nil {
+	if err := m.validateIterator(m.im.Iterator()); err != nil {
 		return fmt.Errorf("basic: %s", err)
-	} else if err := m.validateIterator(m.builder.Map()); err != nil {
+	} else if err := m.validateIterator(m.builder.Iterator()); err != nil {
 		return fmt.Errorf("builder: %s", err)
 	}
 	return nil
 }
 
-func (m *TMap) validateIterator(mm *Map) error {
+func (m *TMap) validateIterator(itr *MapIterator) error {
 	other := make(map[int]int)
-	itr := mm.Iterator()
 	for !itr.Done() {
 		k, v := itr.Next()
 		other[k.(int)] = v.(int)
@@ -1391,7 +1376,7 @@ func BenchmarkMap_Set(b *testing.B) {
 func BenchmarkMap_Delete(b *testing.B) {
 	const n = 10000000
 
-	builder := NewMapBuilder(NewMap(nil))
+	builder := NewMapBuilder(nil)
 	for i := 0; i < n; i++ {
 		builder.Set(i, i)
 	}
@@ -1426,7 +1411,7 @@ func BenchmarkMap_Iterator(b *testing.B) {
 
 func BenchmarkMapBuilder_Set(b *testing.B) {
 	b.ReportAllocs()
-	builder := NewMapBuilder(NewMap(nil))
+	builder := NewMapBuilder(nil)
 	for i := 0; i < b.N; i++ {
 		builder.Set(i, i)
 	}
@@ -1435,7 +1420,7 @@ func BenchmarkMapBuilder_Set(b *testing.B) {
 func BenchmarkMapBuilder_Delete(b *testing.B) {
 	const n = 10000000
 
-	builder := NewMapBuilder(NewMap(nil))
+	builder := NewMapBuilder(nil)
 	for i := 0; i < n; i++ {
 		builder.Set(i, i)
 	}
@@ -1512,7 +1497,7 @@ func ExampleMap_Iterator() {
 }
 
 func ExampleMapBuilder_Set() {
-	b := NewMapBuilder(NewMap(nil))
+	b := NewMapBuilder(nil)
 	b.Set("foo", "bar")
 	b.Set("baz", 100)
 
@@ -1532,7 +1517,7 @@ func ExampleMapBuilder_Set() {
 }
 
 func ExampleMapBuilder_Delete() {
-	b := NewMapBuilder(NewMap(nil))
+	b := NewMapBuilder(nil)
 	b.Set("foo", "bar")
 	b.Set("baz", 100)
 	b.Delete("baz")
@@ -2170,7 +2155,7 @@ type TSortedMap struct {
 func NewTSortedMap() *TSortedMap {
 	return &TSortedMap{
 		im:      NewSortedMap(nil),
-		builder: NewSortedMapBuilder(NewSortedMap(nil)),
+		builder: NewSortedMapBuilder(nil),
 		std:     make(map[int]int),
 	}
 }
@@ -2236,22 +2221,21 @@ func (m *TSortedMap) Validate() error {
 	}
 
 	sort.Ints(m.keys)
-	if err := m.validateForwardIterator(m.im); err != nil {
+	if err := m.validateForwardIterator(m.im.Iterator()); err != nil {
 		return fmt.Errorf("basic: %s", err)
-	} else if err := m.validateBackwardIterator(m.im); err != nil {
+	} else if err := m.validateBackwardIterator(m.im.Iterator()); err != nil {
 		return fmt.Errorf("basic: %s", err)
 	}
 
-	if err := m.validateForwardIterator(m.builder.Map()); err != nil {
+	if err := m.validateForwardIterator(m.builder.Iterator()); err != nil {
 		return fmt.Errorf("basic: %s", err)
-	} else if err := m.validateBackwardIterator(m.builder.Map()); err != nil {
+	} else if err := m.validateBackwardIterator(m.builder.Iterator()); err != nil {
 		return fmt.Errorf("basic: %s", err)
 	}
 	return nil
 }
 
-func (m *TSortedMap) validateForwardIterator(mm *SortedMap) error {
-	itr := mm.Iterator()
+func (m *TSortedMap) validateForwardIterator(itr *SortedMapIterator) error {
 	for i, k0 := range m.keys {
 		v0 := m.std[k0]
 		if k1, v1 := itr.Next(); k0 != k1 || v0 != v1 {
@@ -2269,8 +2253,7 @@ func (m *TSortedMap) validateForwardIterator(mm *SortedMap) error {
 	return nil
 }
 
-func (m *TSortedMap) validateBackwardIterator(mm *SortedMap) error {
-	itr := mm.Iterator()
+func (m *TSortedMap) validateBackwardIterator(itr *SortedMapIterator) error {
 	itr.Last()
 	for i := len(m.keys) - 1; i >= 0; i-- {
 		k0 := m.keys[i]
@@ -2345,7 +2328,7 @@ func BenchmarkSortedMap_Iterator(b *testing.B) {
 
 func BenchmarkSortedMapBuilder_Set(b *testing.B) {
 	b.ReportAllocs()
-	builder := NewSortedMapBuilder(NewSortedMap(nil))
+	builder := NewSortedMapBuilder(nil)
 	for i := 0; i < b.N; i++ {
 		builder.Set(i, i)
 	}
@@ -2354,7 +2337,7 @@ func BenchmarkSortedMapBuilder_Set(b *testing.B) {
 func BenchmarkSortedMapBuilder_Delete(b *testing.B) {
 	const n = 1000000
 
-	builder := NewSortedMapBuilder(NewSortedMap(nil))
+	builder := NewSortedMapBuilder(nil)
 	for i := 0; i < n; i++ {
 		builder.Set(i, i)
 	}
@@ -2431,7 +2414,7 @@ func ExampleSortedMap_Iterator() {
 }
 
 func ExampleSortedMapBuilder_Set() {
-	b := NewSortedMapBuilder(NewSortedMap(nil))
+	b := NewSortedMapBuilder(nil)
 	b.Set("foo", "bar")
 	b.Set("baz", 100)
 
@@ -2451,7 +2434,7 @@ func ExampleSortedMapBuilder_Set() {
 }
 
 func ExampleSortedMapBuilder_Delete() {
-	b := NewSortedMapBuilder(NewSortedMap(nil))
+	b := NewSortedMapBuilder(nil)
 	b.Set("foo", "bar")
 	b.Set("baz", 100)
 	b.Delete("baz")

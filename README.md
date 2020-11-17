@@ -115,7 +115,7 @@ a list in-place until you are ready to use it. This can improve bulk list
 building by 10x or more.
 
 ```go
-b := immutable.NewListBuilder(immutable.NewList())
+b := immutable.NewListBuilder()
 b.Append("foo")
 b.Append("bar")
 b.Set(2, "baz")
@@ -125,8 +125,7 @@ fmt.Println(l.Get(0)) // "foo"
 fmt.Println(l.Get(1)) // "baz"
 ```
 
-Lists are safe to use even after you continue to use the builder. It is also
-safe to build on top of existing lists.
+Builders are invalid after the call to `List()`.
 
 
 ## Map
@@ -230,8 +229,7 @@ fmt.Println(m.Get("foo")) // "300"
 fmt.Println(m.Get("bar")) // "200"
 ```
 
-Maps are safe to use even after you continue to use the builder. You can
-also build on top of existing maps too.
+Builders are invalid after the call to `Map()`.
 
 
 ### Implementing a custom Hasher
