@@ -1004,6 +1004,23 @@ func TestMap_Set(t *testing.T) {
 		}
 	})
 
+	t.Run("ByteArrayKeys", func(t *testing.T) {
+		m := NewMap(nil)
+		m = m.Set([2]byte{1, 2}, "bar")
+		m = m.Set([2]byte{1, 3}, "bat")
+		m = m.Set([0]byte{}, "EMPTY")
+		if v, ok := m.Get([2]byte{1, 2}); !ok || v != "bar" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		} else if v, ok := m.Get([2]byte{1, 3}); !ok || v != "bat" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		} else if v, ok := m.Get([0]byte{}); !ok || v != "EMPTY" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		}
+		if v, ok := m.Get([2]byte{1, 9}); ok {
+			t.Fatalf("expected no value: <%v,%v>", v, ok)
+		}
+	})
+
 	t.Run("NoDefaultHasher", func(t *testing.T) {
 		type T struct{}
 		var r string
@@ -1826,6 +1843,23 @@ func TestSortedMap_Set(t *testing.T) {
 		}
 	})
 
+	t.Run("ByteArrayKeys", func(t *testing.T) {
+		m := NewSortedMap(nil)
+		m = m.Set([2]byte{1, 2}, "bar")
+		m = m.Set([2]byte{1, 3}, "bat")
+		m = m.Set([0]byte{}, "EMPTY")
+		if v, ok := m.Get([2]byte{1, 2}); !ok || v != "bar" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		} else if v, ok := m.Get([2]byte{1, 3}); !ok || v != "bat" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		} else if v, ok := m.Get([0]byte{}); !ok || v != "EMPTY" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		}
+		if v, ok := m.Get([2]byte{1, 9}); ok {
+			t.Fatalf("expected no value: <%v,%v>", v, ok)
+		}
+	})
+
 	t.Run("NoDefaultComparer", func(t *testing.T) {
 		var r string
 		func() {
@@ -2079,6 +2113,7 @@ func TestNewHasher(t *testing.T) {
 
 		t.Run("string", func(t *testing.T) { testNewHasher(t, "foo") })
 		t.Run("byteSlice", func(t *testing.T) { testNewHasher(t, []byte("foo")) })
+		t.Run("byteArray", func(t *testing.T) { testNewHasher(t, [2]byte{1, 2}) })
 	})
 
 	t.Run("reflection", func(t *testing.T) {
@@ -2129,6 +2164,8 @@ func TestNewComparer(t *testing.T) {
 
 		type String string
 		t.Run("string", func(t *testing.T) { testNewComparer(t, String("bar"), String("foo")) })
+
+		t.Run("byteArray", func(t *testing.T) { testNewComparer(t, [2]byte{1, 2}, [2]byte{1, 3 }) })
 	})
 }
 

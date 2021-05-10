@@ -2232,13 +2232,18 @@ func NewHasher(key interface{}) Hasher {
 
 	// Fallback to reflection-based hasher otherwise.
 	// This is used when caller wraps a type around a primitive type.
-	switch reflect.TypeOf(key).Kind() {
+	keyType := reflect.TypeOf(key)
+	switch keyType.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return &reflectIntHasher{}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return &reflectUintHasher{}
 	case reflect.String:
 		return &reflectStringHasher{}
+	case reflect.Array:
+		if keyType.Elem().Kind() == reflect.Uint8 {
+			return &reflectUIntArrayHasher{}
+		}
 	}
 
 	// If no hashers match then panic.
@@ -2390,9 +2395,9 @@ func (h *uint64Hasher) Equal(a, b interface{}) bool {
 type stringHasher struct{}
 
 // Hash returns a hash for value.
-func (h *stringHasher) Hash(value interface{}) uint32 {
+func (h *stringHasher) Hash(key interface{}) uint32 {
 	var hash uint32
-	for i, value := 0, value.(string); i < len(value); i++ {
+	for i, value := 0, key.(string); i < len(value); i++ {
 		hash = 31*hash + uint32(value[i])
 	}
 	return hash
@@ -2408,9 +2413,9 @@ func (h *stringHasher) Equal(a, b interface{}) bool {
 type byteSliceHasher struct{}
 
 // Hash returns a hash for value.
-func (h *byteSliceHasher) Hash(value interface{}) uint32 {
+func (h *byteSliceHasher) Hash(key interface{}) uint32 {
 	var hash uint32
-	for i, value := 0, value.([]byte); i < len(value); i++ {
+	for i, value := 0, key.([]byte); i < len(value); i++ {
 		hash = 31*hash + uint32(value[i])
 	}
 	return hash
@@ -2454,9 +2459,9 @@ func (h *reflectUintHasher) Equal(a, b interface{}) bool {
 type reflectStringHasher struct{}
 
 // Hash returns a hash for value.
-func (h *reflectStringHasher) Hash(value interface{}) uint32 {
+func (h *reflectStringHasher) Hash(key interface{}) uint32 {
 	var hash uint32
-	s := reflect.ValueOf(value).String()
+	s := reflect.ValueOf(key).String()
 	for i := 0; i < len(s); i++ {
 		hash = 31*hash + uint32(s[i])
 	}
@@ -2467,6 +2472,43 @@ func (h *reflectStringHasher) Hash(value interface{}) uint32 {
 // Panics if a and b are not strings.
 func (h *reflectStringHasher) Equal(a, b interface{}) bool {
 	return reflect.ValueOf(a).String() == reflect.ValueOf(b).String()
+}
+
+// reflectUIntArrayHasher implements a reflection-based Hasher for arrays.
+type reflectUIntArrayHasher struct{}
+
+// Hash returns a hash for key.
+func (h *reflectUIntArrayHasher) Hash(key interface{}) uint32 {
+	v := reflect.ValueOf(key)
+
+	var hash uint32
+	for i := 0; i < v.Len(); i++ {
+		hash = 31*hash + uint32(v.Index(i).Uint())
+	}
+	return hash
+}
+
+// Equal returns true if a is equal to b. Otherwise returns false.
+// Panics if a and b are not arrays of unsigned ints.
+func (h *reflectUIntArrayHasher) Equal(a, b interface{}) bool {
+	v1 := reflect.ValueOf(a)
+	v2 := reflect.ValueOf(b)
+
+	if v1.Kind() != reflect.Array || v2.Kind() != reflect.Array {
+		panic("Values are not arrays")
+	}
+	if v1.Type().Elem() != v2.Type().Elem() {
+		panic("Array values are not of the same type")
+	}
+	if v1.Len() != v2.Len() {
+		return false
+	}
+	for i := 0; i < v1.Len(); i++ {
+		if v1.Index(i).Uint() != v2.Index(i).Uint() {
+			return false
+		}
+	}
+	return true
 }
 
 // hashUint64 returns a 32-bit hash for a 64-bit value.
@@ -2518,13 +2560,18 @@ func NewComparer(key interface{}) Comparer {
 
 	// Fallback to reflection-based comparer otherwise.
 	// This is used when caller wraps a type around a primitive type.
-	switch reflect.TypeOf(key).Kind() {
+	keyType := reflect.TypeOf(key)
+	switch keyType.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return &reflectIntComparer{}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return &reflectUintComparer{}
 	case reflect.String:
 		return &reflectStringComparer{}
+	case reflect.Array:
+		if keyType.Elem().Kind() == reflect.Uint8 {
+			return &reflectUIntArrayComparer{}
+		}
 	}
 
 	// If no comparers match then panic.
@@ -2725,6 +2772,36 @@ type reflectStringComparer struct{}
 // returns 0 if a is equal to b. Panic if a or b is not an int.
 func (c *reflectStringComparer) Compare(a, b interface{}) int {
 	return strings.Compare(reflect.ValueOf(a).String(), reflect.ValueOf(b).String())
+}
+
+// reflectStringComparer compares two string values using reflection. Implements Comparer.
+type reflectUIntArrayComparer struct{}
+
+// Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
+// returns 0 if a is equal to b. Panic if a or b is not an int.
+func (c *reflectUIntArrayComparer) Compare(a, b interface{}) int {
+	v1 := reflect.ValueOf(a)
+	v2 := reflect.ValueOf(b)
+
+	if v1.Kind() != reflect.Array || v2.Kind() != reflect.Array {
+		panic("Values are not arrays")
+	}
+	if v1.Type().Elem() != v2.Type().Elem() {
+		panic("Array values are not of the same type")
+	}
+	for i := 0; i < v1.Len() && i < v2.Len(); i++ {
+		if x, y := v1.Index(i).Uint(), v2.Index(i).Uint(); x < y {
+			return -1
+		} else if x > y {
+			return 1
+		}
+	}
+	if l1, l2 := v1.Len(), v2.Len(); l1 < l2 {
+		return -1
+	} else if l1 > l2 {
+		return 1
+	}
+	return 0
 }
 
 func assert(condition bool, message string) {
