@@ -219,7 +219,7 @@ to use the `MapBuilder`. It uses nearly the same API as `Map` except that it
 updates a map in-place until you are ready to use it. 
 
 ```go
-b := immutable.NewMapBuilder(immutable.NewMap(nil))
+b := immutable.NewMapBuilder(nil)
 b.Set("foo", 100)
 b.Set("bar", 200)
 b.Set("foo", 300)
