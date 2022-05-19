@@ -1,4 +1,4 @@
-module github.com/benbjohnson/immutable
+module github.com/benbjohnson/immutable/v2
 
 go 1.18
 
