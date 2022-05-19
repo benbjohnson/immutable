@@ -15,13 +15,13 @@ var (
 
 func TestList(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		if size := NewList().Len(); size != 0 {
+		if size := NewList[string]().Len(); size != 0 {
 			t.Fatalf("unexpected size: %d", size)
 		}
 	})
 
 	t.Run("Shallow", func(t *testing.T) {
-		list := NewList()
+		list := NewList[string]()
 		list = list.Append("foo")
 		if v := list.Get(0); v != "foo" {
 			t.Fatalf("unexpected value: %v", v)
@@ -40,7 +40,7 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("Deep", func(t *testing.T) {
-		list := NewList()
+		list := NewList[int]()
 		var array []int
 		for i := 0; i < 100000; i++ {
 			list = list.Append(i)
@@ -51,14 +51,14 @@ func TestList(t *testing.T) {
 			t.Fatalf("List.Len()=%d, exp %d", got, exp)
 		}
 		for j := range array {
-			if got, exp := list.Get(j).(int), array[j]; got != exp {
+			if got, exp := list.Get(j), array[j]; got != exp {
 				t.Fatalf("%d. List.Get(%d)=%d, exp %d", len(array), j, got, exp)
 			}
 		}
 	})
 
 	t.Run("Set", func(t *testing.T) {
-		list := NewList()
+		list := NewList[string]()
 		list = list.Append("foo")
 		list = list.Append("bar")
 
@@ -78,7 +78,7 @@ func TestList(t *testing.T) {
 		var r string
 		func() {
 			defer func() { r = recover().(string) }()
-			l := NewList()
+			l := NewList[string]()
 			l = l.Append("foo")
 			l.Get(-1)
 		}()
@@ -91,7 +91,7 @@ func TestList(t *testing.T) {
 		var r string
 		func() {
 			defer func() { r = recover().(string) }()
-			l := NewList()
+			l := NewList[string]()
 			l = l.Append("foo")
 			l.Get(1)
 		}()
@@ -104,7 +104,7 @@ func TestList(t *testing.T) {
 		var r string
 		func() {
 			defer func() { r = recover().(string) }()
-			l := NewList()
+			l := NewList[string]()
 			l = l.Append("foo")
 			l.Set(1, "bar")
 		}()
@@ -117,7 +117,7 @@ func TestList(t *testing.T) {
 		var r string
 		func() {
 			defer func() { r = recover().(string) }()
-			l := NewList()
+			l := NewList[string]()
 			l = l.Append("foo")
 			l.Slice(2, 3)
 		}()
@@ -130,7 +130,7 @@ func TestList(t *testing.T) {
 		var r string
 		func() {
 			defer func() { r = recover().(string) }()
-			l := NewList()
+			l := NewList[string]()
 			l = l.Append("foo")
 			l.Slice(1, 3)
 		}()
@@ -143,7 +143,7 @@ func TestList(t *testing.T) {
 		var r string
 		func() {
 			defer func() { r = recover().(string) }()
-			l := NewList()
+			l := NewList[string]()
 			l = l.Append("foo")
 			l = l.Append("bar")
 			l.Slice(2, 1)
@@ -154,7 +154,7 @@ func TestList(t *testing.T) {
 	})
 
 	t.Run("SliceBeginning", func(t *testing.T) {
-		l := NewList()
+		l := NewList[string]()
 		l = l.Append("foo")
 		l = l.Append("bar")
 		l = l.Slice(1, 2)
@@ -169,7 +169,7 @@ func TestList(t *testing.T) {
 		var r string
 		func() {
 			defer func() { r = recover().(string) }()
-			l := NewList()
+			l := NewList[string]()
 			l = l.Append("foo")
 			l.Iterator().Seek(-1)
 		}()
@@ -204,16 +204,16 @@ func TestList(t *testing.T) {
 
 // TList represents a list that operates on a standard Go slice & immutable list.
 type TList struct {
-	im, prev *List
-	builder  *ListBuilder
+	im, prev *List[int]
+	builder  *ListBuilder[int]
 	std      []int
 }
 
 // NewTList returns a new instance of TList.
 func NewTList() *TList {
 	return &TList{
-		im:      NewList(),
-		builder: NewListBuilder(),
+		im:      NewList[int](),
+		builder: NewListBuilder[int](),
 	}
 }
 
@@ -302,7 +302,7 @@ func (l *TList) Validate() error {
 	return nil
 }
 
-func (l *TList) validateForwardIterator(typ string, itr *ListIterator) error {
+func (l *TList) validateForwardIterator(typ string, itr *ListIterator[int]) error {
 	for i := range l.std {
 		if j, v := itr.Next(); i != j || l.std[i] != v {
 			return fmt.Errorf("ListIterator.Next()=<%v,%v>, expected <%v,%v> [%s]", j, v, i, l.std[i], typ)
@@ -313,13 +313,13 @@ func (l *TList) validateForwardIterator(typ string, itr *ListIterator) error {
 			return fmt.Errorf("ListIterator.Done()=%v, expected %v [%s]", v, done, typ)
 		}
 	}
-	if i, v := itr.Next(); i != -1 || v != nil {
+	if i, v := itr.Next(); i != -1 || v != 0 {
 		return fmt.Errorf("ListIterator.Next()=<%v,%v>, expected DONE [%s]", i, v, typ)
 	}
 	return nil
 }
 
-func (l *TList) validateBackwardIterator(typ string, itr *ListIterator) error {
+func (l *TList) validateBackwardIterator(typ string, itr *ListIterator[int]) error {
 	itr.Last()
 	for i := len(l.std) - 1; i >= 0; i-- {
 		if j, v := itr.Prev(); i != j || l.std[i] != v {
@@ -331,7 +331,7 @@ func (l *TList) validateBackwardIterator(typ string, itr *ListIterator) error {
 			return fmt.Errorf("ListIterator.Done()=%v, expected %v [%s]", v, done, typ)
 		}
 	}
-	if i, v := itr.Prev(); i != -1 || v != nil {
+	if i, v := itr.Prev(); i != -1 || v != 0 {
 		return fmt.Errorf("ListIterator.Prev()=<%v,%v>, expected DONE [%s]", i, v, typ)
 	}
 	return nil
@@ -339,7 +339,7 @@ func (l *TList) validateBackwardIterator(typ string, itr *ListIterator) error {
 
 func BenchmarkList_Append(b *testing.B) {
 	b.ReportAllocs()
-	l := NewList()
+	l := NewList[int]()
 	for i := 0; i < b.N; i++ {
 		l = l.Append(i)
 	}
@@ -347,7 +347,7 @@ func BenchmarkList_Append(b *testing.B) {
 
 func BenchmarkList_Prepend(b *testing.B) {
 	b.ReportAllocs()
-	l := NewList()
+	l := NewList[int]()
 	for i := 0; i < b.N; i++ {
 		l = l.Prepend(i)
 	}
@@ -356,7 +356,7 @@ func BenchmarkList_Prepend(b *testing.B) {
 func BenchmarkList_Set(b *testing.B) {
 	const n = 10000
 
-	l := NewList()
+	l := NewList[int]()
 	for i := 0; i < 10000; i++ {
 		l = l.Append(i)
 	}
@@ -370,7 +370,7 @@ func BenchmarkList_Set(b *testing.B) {
 
 func BenchmarkList_Iterator(b *testing.B) {
 	const n = 10000
-	l := NewList()
+	l := NewList[int]()
 	for i := 0; i < 10000; i++ {
 		l = l.Append(i)
 	}
@@ -417,7 +417,7 @@ func BenchmarkBuiltinSlice_Append(b *testing.B) {
 
 func BenchmarkListBuilder_Append(b *testing.B) {
 	b.ReportAllocs()
-	builder := NewListBuilder()
+	builder := NewListBuilder[int]()
 	for i := 0; i < b.N; i++ {
 		builder.Append(i)
 	}
@@ -425,7 +425,7 @@ func BenchmarkListBuilder_Append(b *testing.B) {
 
 func BenchmarkListBuilder_Prepend(b *testing.B) {
 	b.ReportAllocs()
-	builder := NewListBuilder()
+	builder := NewListBuilder[int]()
 	for i := 0; i < b.N; i++ {
 		builder.Prepend(i)
 	}
@@ -434,7 +434,7 @@ func BenchmarkListBuilder_Prepend(b *testing.B) {
 func BenchmarkListBuilder_Set(b *testing.B) {
 	const n = 10000
 
-	builder := NewListBuilder()
+	builder := NewListBuilder[int]()
 	for i := 0; i < 10000; i++ {
 		builder.Append(i)
 	}
@@ -447,7 +447,7 @@ func BenchmarkListBuilder_Set(b *testing.B) {
 }
 
 func ExampleList_Append() {
-	l := NewList()
+	l := NewList[string]()
 	l = l.Append("foo")
 	l = l.Append("bar")
 	l = l.Append("baz")
@@ -462,7 +462,7 @@ func ExampleList_Append() {
 }
 
 func ExampleList_Prepend() {
-	l := NewList()
+	l := NewList[string]()
 	l = l.Prepend("foo")
 	l = l.Prepend("bar")
 	l = l.Prepend("baz")
@@ -477,7 +477,7 @@ func ExampleList_Prepend() {
 }
 
 func ExampleList_Set() {
-	l := NewList()
+	l := NewList[string]()
 	l = l.Append("foo")
 	l = l.Append("bar")
 	l = l.Set(1, "baz")
@@ -490,7 +490,7 @@ func ExampleList_Set() {
 }
 
 func ExampleList_Slice() {
-	l := NewList()
+	l := NewList[string]()
 	l = l.Append("foo")
 	l = l.Append("bar")
 	l = l.Append("baz")
@@ -504,7 +504,7 @@ func ExampleList_Slice() {
 }
 
 func ExampleList_Iterator() {
-	l := NewList()
+	l := NewList[string]()
 	l = l.Append("foo")
 	l = l.Append("bar")
 	l = l.Append("baz")
@@ -521,7 +521,7 @@ func ExampleList_Iterator() {
 }
 
 func ExampleList_Iterator_reverse() {
-	l := NewList()
+	l := NewList[string]()
 	l = l.Append("foo")
 	l = l.Append("bar")
 	l = l.Append("baz")
@@ -539,7 +539,7 @@ func ExampleList_Iterator_reverse() {
 }
 
 func ExampleListBuilder_Append() {
-	b := NewListBuilder()
+	b := NewListBuilder[string]()
 	b.Append("foo")
 	b.Append("bar")
 	b.Append("baz")
@@ -555,7 +555,7 @@ func ExampleListBuilder_Append() {
 }
 
 func ExampleListBuilder_Prepend() {
-	b := NewListBuilder()
+	b := NewListBuilder[string]()
 	b.Prepend("foo")
 	b.Prepend("bar")
 	b.Prepend("baz")
@@ -571,7 +571,7 @@ func ExampleListBuilder_Prepend() {
 }
 
 func ExampleListBuilder_Set() {
-	b := NewListBuilder()
+	b := NewListBuilder[string]()
 	b.Append("foo")
 	b.Append("bar")
 	b.Set(1, "baz")
@@ -585,7 +585,7 @@ func ExampleListBuilder_Set() {
 }
 
 func ExampleListBuilder_Slice() {
-	b := NewListBuilder()
+	b := NewListBuilder[string]()
 	b.Append("foo")
 	b.Append("bar")
 	b.Append("baz")

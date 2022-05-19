@@ -54,38 +54,38 @@ import (
 // in Go. They can be updated by appending to the end of the list, prepending
 // values to the beginning of the list, or updating existing indexes in the
 // list.
-type List struct {
-	root   listNode // root node
-	origin int      // offset to zero index element
-	size   int      // total number of elements in use
+type List[T comparable] struct {
+	root   listNode[T] // root node
+	origin int         // offset to zero index element
+	size   int         // total number of elements in use
 }
 
 // NewList returns a new empty instance of List.
-func NewList() *List {
-	return &List{
-		root: &listLeafNode{},
+func NewList[T comparable]() *List[T] {
+	return &List[T]{
+		root: &listLeafNode[T]{},
 	}
 }
 
 // clone returns a copy of the list.
-func (l *List) clone() *List {
+func (l *List[T]) clone() *List[T] {
 	other := *l
 	return &other
 }
 
 // Len returns the number of elements in the list.
-func (l *List) Len() int {
+func (l *List[T]) Len() int {
 	return l.size
 }
 
 // cap returns the total number of possible elements for the current depth.
-func (l *List) cap() int {
+func (l *List[T]) cap() int {
 	return 1 << (l.root.depth() * listNodeBits)
 }
 
 // Get returns the value at the given index. Similar to slices, this method will
 // panic if index is below zero or is greater than or equal to the list size.
-func (l *List) Get(index int) interface{} {
+func (l *List[T]) Get(index int) T {
 	if index < 0 || index >= l.size {
 		panic(fmt.Sprintf("immutable.List.Get: index %d out of bounds", index))
 	}
@@ -95,11 +95,11 @@ func (l *List) Get(index int) interface{} {
 // Set returns a new list with value set at index. Similar to slices, this
 // method will panic if index is below zero or if the index is greater than
 // or equal to the list size.
-func (l *List) Set(index int, value interface{}) *List {
+func (l *List[T]) Set(index int, value T) *List[T] {
 	return l.set(index, value, false)
 }
 
-func (l *List) set(index int, value interface{}, mutable bool) *List {
+func (l *List[T]) set(index int, value T, mutable bool) *List[T] {
 	if index < 0 || index >= l.size {
 		panic(fmt.Sprintf("immutable.List.Set: index %d out of bounds", index))
 	}
@@ -112,11 +112,11 @@ func (l *List) set(index int, value interface{}, mutable bool) *List {
 }
 
 // Append returns a new list with value added to the end of the list.
-func (l *List) Append(value interface{}) *List {
+func (l *List[T]) Append(value T) *List[T] {
 	return l.append(value, false)
 }
 
-func (l *List) append(value interface{}, mutable bool) *List {
+func (l *List[T]) append(value T, mutable bool) *List[T] {
 	other := l
 	if !mutable {
 		other = l.clone()
@@ -124,7 +124,7 @@ func (l *List) append(value interface{}, mutable bool) *List {
 
 	// Expand list to the right if no slots remain.
 	if other.size+other.origin >= l.cap() {
-		newRoot := &listBranchNode{d: other.root.depth() + 1}
+		newRoot := &listBranchNode[T]{d: other.root.depth() + 1}
 		newRoot.children[0] = other.root
 		other.root = newRoot
 	}
@@ -136,11 +136,11 @@ func (l *List) append(value interface{}, mutable bool) *List {
 }
 
 // Prepend returns a new list with value added to the beginning of the list.
-func (l *List) Prepend(value interface{}) *List {
+func (l *List[T]) Prepend(value T) *List[T] {
 	return l.prepend(value, false)
 }
 
-func (l *List) prepend(value interface{}, mutable bool) *List {
+func (l *List[T]) prepend(value T, mutable bool) *List[T] {
 	other := l
 	if !mutable {
 		other = l.clone()
@@ -148,7 +148,7 @@ func (l *List) prepend(value interface{}, mutable bool) *List {
 
 	// Expand list to the left if no slots remain.
 	if other.origin == 0 {
-		newRoot := &listBranchNode{d: other.root.depth() + 1}
+		newRoot := &listBranchNode[T]{d: other.root.depth() + 1}
 		newRoot.children[listNodeSize-1] = other.root
 		other.root = newRoot
 		other.origin += (listNodeSize - 1) << (other.root.depth() * listNodeBits)
@@ -168,11 +168,11 @@ func (l *List) prepend(value interface{}, mutable bool) *List {
 //
 // Unlike Go slices, references to inaccessible elements will be automatically
 // removed so they can be garbage collected.
-func (l *List) Slice(start, end int) *List {
+func (l *List[T]) Slice(start, end int) *List[T] {
 	return l.slice(start, end, false)
 }
 
-func (l *List) slice(start, end int, mutable bool) *List {
+func (l *List[T]) slice(start, end int, mutable bool) *List[T] {
 	// Panics similar to Go slices.
 	if start < 0 || start > l.size {
 		panic(fmt.Sprintf("immutable.List.Slice: start index %d out of bounds", start))
@@ -207,7 +207,7 @@ func (l *List) slice(start, end int, mutable bool) *List {
 
 		// Replace the current root with the single child & update origin offset.
 		other.origin -= i << (other.root.depth() * listNodeBits)
-		other.root = other.root.(*listBranchNode).children[i]
+		other.root = other.root.(*listBranchNode[T]).children[i]
 	}
 
 	// Ensure all references are removed before start & after end.
@@ -218,25 +218,25 @@ func (l *List) slice(start, end int, mutable bool) *List {
 }
 
 // Iterator returns a new iterator for this list positioned at the first index.
-func (l *List) Iterator() *ListIterator {
-	itr := &ListIterator{list: l}
+func (l *List[T]) Iterator() *ListIterator[T] {
+	itr := &ListIterator[T]{list: l}
 	itr.First()
 	return itr
 }
 
 // ListBuilder represents an efficient builder for creating new Lists.
-type ListBuilder struct {
-	list *List // current state
+type ListBuilder[T comparable] struct {
+	list *List[T] // current state
 }
 
 // NewListBuilder returns a new instance of ListBuilder.
-func NewListBuilder() *ListBuilder {
-	return &ListBuilder{list: NewList()}
+func NewListBuilder[T comparable]() *ListBuilder[T] {
+	return &ListBuilder[T]{list: NewList[T]()}
 }
 
 // List returns the current copy of the list.
 // The builder should not be used again after the list after this call.
-func (b *ListBuilder) List() *List {
+func (b *ListBuilder[T]) List() *List[T] {
 	assert(b.list != nil, "immutable.ListBuilder.List(): duplicate call to fetch list")
 	list := b.list
 	b.list = nil
@@ -244,14 +244,14 @@ func (b *ListBuilder) List() *List {
 }
 
 // Len returns the number of elements in the underlying list.
-func (b *ListBuilder) Len() int {
+func (b *ListBuilder[T]) Len() int {
 	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
 	return b.list.Len()
 }
 
 // Get returns the value at the given index. Similar to slices, this method will
 // panic if index is below zero or is greater than or equal to the list size.
-func (b *ListBuilder) Get(index int) interface{} {
+func (b *ListBuilder[T]) Get(index int) T {
 	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
 	return b.list.Get(index)
 }
@@ -259,32 +259,32 @@ func (b *ListBuilder) Get(index int) interface{} {
 // Set updates the value at the given index. Similar to slices, this method will
 // panic if index is below zero or if the index is greater than or equal to the
 // list size.
-func (b *ListBuilder) Set(index int, value interface{}) {
+func (b *ListBuilder[T]) Set(index int, value T) {
 	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
 	b.list = b.list.set(index, value, true)
 }
 
 // Append adds value to the end of the list.
-func (b *ListBuilder) Append(value interface{}) {
+func (b *ListBuilder[T]) Append(value T) {
 	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
 	b.list = b.list.append(value, true)
 }
 
 // Prepend adds value to the beginning of the list.
-func (b *ListBuilder) Prepend(value interface{}) {
+func (b *ListBuilder[T]) Prepend(value T) {
 	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
 	b.list = b.list.prepend(value, true)
 }
 
 // Slice updates the list with a sublist of elements between start and end index.
 // See List.Slice() for more details.
-func (b *ListBuilder) Slice(start, end int) {
+func (b *ListBuilder[T]) Slice(start, end int) {
 	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
 	b.list = b.list.slice(start, end, true)
 }
 
 // Iterator returns a new iterator for the underlying list.
-func (b *ListBuilder) Iterator() *ListIterator {
+func (b *ListBuilder[T]) Iterator() *ListIterator[T] {
 	assert(b.list != nil, "immutable.ListBuilder: builder invalid after List() invocation")
 	return b.list.Iterator()
 }
@@ -297,53 +297,53 @@ const (
 )
 
 // listNode represents either a branch or leaf node in a List.
-type listNode interface {
+type listNode[T comparable] interface {
 	depth() uint
-	get(index int) interface{}
-	set(index int, v interface{}, mutable bool) listNode
+	get(index int) T
+	set(index int, v T, mutable bool) listNode[T]
 
 	containsBefore(index int) bool
 	containsAfter(index int) bool
 
-	deleteBefore(index int, mutable bool) listNode
-	deleteAfter(index int, mutable bool) listNode
+	deleteBefore(index int, mutable bool) listNode[T]
+	deleteAfter(index int, mutable bool) listNode[T]
 }
 
 // newListNode returns a leaf node for depth zero, otherwise returns a branch node.
-func newListNode(depth uint) listNode {
+func newListNode[T comparable](depth uint) listNode[T] {
 	if depth == 0 {
-		return &listLeafNode{}
+		return &listLeafNode[T]{}
 	}
-	return &listBranchNode{d: depth}
+	return &listBranchNode[T]{d: depth}
 }
 
 // listBranchNode represents a branch of a List tree at a given depth.
-type listBranchNode struct {
+type listBranchNode[T comparable] struct {
 	d        uint // depth
-	children [listNodeSize]listNode
+	children [listNodeSize]listNode[T]
 }
 
 // depth returns the depth of this branch node from the leaf.
-func (n *listBranchNode) depth() uint { return n.d }
+func (n *listBranchNode[T]) depth() uint { return n.d }
 
 // get returns the child node at the segment of the index for this depth.
-func (n *listBranchNode) get(index int) interface{} {
+func (n *listBranchNode[T]) get(index int) T {
 	idx := (index >> (n.d * listNodeBits)) & listNodeMask
 	return n.children[idx].get(index)
 }
 
 // set recursively updates the value at index for each lower depth from the node.
-func (n *listBranchNode) set(index int, v interface{}, mutable bool) listNode {
+func (n *listBranchNode[T]) set(index int, v T, mutable bool) listNode[T] {
 	idx := (index >> (n.d * listNodeBits)) & listNodeMask
 
 	// Find child for the given value in the branch. Create new if it doesn't exist.
 	child := n.children[idx]
 	if child == nil {
-		child = newListNode(n.depth() - 1)
+		child = newListNode[T](n.depth() - 1)
 	}
 
 	// Return a copy of this branch with the new child.
-	var other *listBranchNode
+	var other *listBranchNode[T]
 	if mutable {
 		other = n
 	} else {
@@ -355,7 +355,7 @@ func (n *listBranchNode) set(index int, v interface{}, mutable bool) listNode {
 }
 
 // containsBefore returns true if non-nil values exists between [0,index).
-func (n *listBranchNode) containsBefore(index int) bool {
+func (n *listBranchNode[T]) containsBefore(index int) bool {
 	idx := (index >> (n.d * listNodeBits)) & listNodeMask
 
 	// Quickly check if any direct children exist before this segment of the index.
@@ -373,7 +373,7 @@ func (n *listBranchNode) containsBefore(index int) bool {
 }
 
 // containsAfter returns true if non-nil values exists between (index,listNodeSize).
-func (n *listBranchNode) containsAfter(index int) bool {
+func (n *listBranchNode[T]) containsAfter(index int) bool {
 	idx := (index >> (n.d * listNodeBits)) & listNodeMask
 
 	// Quickly check if any direct children exist after this segment of the index.
@@ -391,7 +391,7 @@ func (n *listBranchNode) containsAfter(index int) bool {
 }
 
 // deleteBefore returns a new node with all elements before index removed.
-func (n *listBranchNode) deleteBefore(index int, mutable bool) listNode {
+func (n *listBranchNode[T]) deleteBefore(index int, mutable bool) listNode[T] {
 	// Ignore if no nodes exist before the given index.
 	if !n.containsBefore(index) {
 		return n
@@ -400,14 +400,14 @@ func (n *listBranchNode) deleteBefore(index int, mutable bool) listNode {
 	// Return a copy with any nodes prior to the index removed.
 	idx := (index >> (n.d * listNodeBits)) & listNodeMask
 
-	var other *listBranchNode
+	var other *listBranchNode[T]
 	if mutable {
 		other = n
 		for i := 0; i < idx; i++ {
 			n.children[i] = nil
 		}
 	} else {
-		other = &listBranchNode{d: n.d}
+		other = &listBranchNode[T]{d: n.d}
 		copy(other.children[idx:][:], n.children[idx:][:])
 	}
 
@@ -418,7 +418,7 @@ func (n *listBranchNode) deleteBefore(index int, mutable bool) listNode {
 }
 
 // deleteBefore returns a new node with all elements before index removed.
-func (n *listBranchNode) deleteAfter(index int, mutable bool) listNode {
+func (n *listBranchNode[T]) deleteAfter(index int, mutable bool) listNode[T] {
 	// Ignore if no nodes exist after the given index.
 	if !n.containsAfter(index) {
 		return n
@@ -427,14 +427,14 @@ func (n *listBranchNode) deleteAfter(index int, mutable bool) listNode {
 	// Return a copy with any nodes after the index removed.
 	idx := (index >> (n.d * listNodeBits)) & listNodeMask
 
-	var other *listBranchNode
+	var other *listBranchNode[T]
 	if mutable {
 		other = n
 		for i := idx + 1; i < len(n.children); i++ {
 			n.children[i] = nil
 		}
 	} else {
-		other = &listBranchNode{d: n.d}
+		other = &listBranchNode[T]{d: n.d}
 		copy(other.children[:idx+1], n.children[:idx+1])
 	}
 
@@ -445,22 +445,22 @@ func (n *listBranchNode) deleteAfter(index int, mutable bool) listNode {
 }
 
 // listLeafNode represents a leaf node in a List.
-type listLeafNode struct {
-	children [listNodeSize]interface{}
+type listLeafNode[T comparable] struct {
+	children [listNodeSize]T
 }
 
 // depth always returns 0 for leaf nodes.
-func (n *listLeafNode) depth() uint { return 0 }
+func (n *listLeafNode[T]) depth() uint { return 0 }
 
 // get returns the value at the given index.
-func (n *listLeafNode) get(index int) interface{} {
+func (n *listLeafNode[T]) get(index int) T {
 	return n.children[index&listNodeMask]
 }
 
 // set returns a copy of the node with the value at the index updated to v.
-func (n *listLeafNode) set(index int, v interface{}, mutable bool) listNode {
+func (n *listLeafNode[T]) set(index int, v T, mutable bool) listNode[T] {
 	idx := index & listNodeMask
-	var other *listLeafNode
+	var other *listLeafNode[T]
 	if mutable {
 		other = n
 	} else {
@@ -468,14 +468,17 @@ func (n *listLeafNode) set(index int, v interface{}, mutable bool) listNode {
 		other = &tmp
 	}
 	other.children[idx] = v
-	return other
+	var otherLN listNode[T]
+	otherLN = other
+	return otherLN
 }
 
 // containsBefore returns true if non-nil values exists between [0,index).
-func (n *listLeafNode) containsBefore(index int) bool {
+func (n *listLeafNode[T]) containsBefore(index int) bool {
 	idx := index & listNodeMask
+	var empty T
 	for i := 0; i < idx; i++ {
-		if n.children[i] != nil {
+		if n.children[i] != empty {
 			return true
 		}
 	}
@@ -483,10 +486,11 @@ func (n *listLeafNode) containsBefore(index int) bool {
 }
 
 // containsAfter returns true if non-nil values exists between (index,listNodeSize).
-func (n *listLeafNode) containsAfter(index int) bool {
+func (n *listLeafNode[T]) containsAfter(index int) bool {
 	idx := index & listNodeMask
+	var empty T
 	for i := idx + 1; i < len(n.children); i++ {
-		if n.children[i] != nil {
+		if n.children[i] != empty {
 			return true
 		}
 	}
@@ -494,62 +498,64 @@ func (n *listLeafNode) containsAfter(index int) bool {
 }
 
 // deleteBefore returns a new node with all elements before index removed.
-func (n *listLeafNode) deleteBefore(index int, mutable bool) listNode {
+func (n *listLeafNode[T]) deleteBefore(index int, mutable bool) listNode[T] {
 	if !n.containsBefore(index) {
 		return n
 	}
 
 	idx := index & listNodeMask
-	var other *listLeafNode
+	var other *listLeafNode[T]
 	if mutable {
 		other = n
+		var empty T
 		for i := 0; i < idx; i++ {
-			other.children[i] = nil
+			other.children[i] = empty
 		}
 	} else {
-		other = &listLeafNode{}
+		other = &listLeafNode[T]{}
 		copy(other.children[idx:][:], n.children[idx:][:])
 	}
 	return other
 }
 
 // deleteBefore returns a new node with all elements before index removed.
-func (n *listLeafNode) deleteAfter(index int, mutable bool) listNode {
+func (n *listLeafNode[T]) deleteAfter(index int, mutable bool) listNode[T] {
 	if !n.containsAfter(index) {
 		return n
 	}
 
 	idx := index & listNodeMask
-	var other *listLeafNode
+	var other *listLeafNode[T]
 	if mutable {
 		other = n
+		var empty T
 		for i := idx + 1; i < len(n.children); i++ {
-			other.children[i] = nil
+			other.children[i] = empty
 		}
 	} else {
-		other = &listLeafNode{}
+		other = &listLeafNode[T]{}
 		copy(other.children[:idx+1][:], n.children[:idx+1][:])
 	}
 	return other
 }
 
 // ListIterator represents an ordered iterator over a list.
-type ListIterator struct {
-	list  *List // source list
-	index int   // current index position
+type ListIterator[T comparable] struct {
+	list  *List[T] // source list
+	index int      // current index position
 
-	stack [32]listIteratorElem // search stack
-	depth int                  // stack depth
+	stack [32]listIteratorElem[T] // search stack
+	depth int                     // stack depth
 }
 
 // Done returns true if no more elements remain in the iterator.
-func (itr *ListIterator) Done() bool {
+func (itr *ListIterator[T]) Done() bool {
 	return itr.index < 0 || itr.index >= itr.list.Len()
 }
 
 // First positions the iterator on the first index.
 // If source list is empty then no change is made.
-func (itr *ListIterator) First() {
+func (itr *ListIterator[T]) First() {
 	if itr.list.Len() != 0 {
 		itr.Seek(0)
 	}
@@ -557,7 +563,7 @@ func (itr *ListIterator) First() {
 
 // Last positions the iterator on the last index.
 // If source list is empty then no change is made.
-func (itr *ListIterator) Last() {
+func (itr *ListIterator[T]) Last() {
 	if n := itr.list.Len(); n != 0 {
 		itr.Seek(n - 1)
 	}
@@ -566,7 +572,7 @@ func (itr *ListIterator) Last() {
 // Seek moves the iterator position to the given index in the list.
 // Similar to Go slices, this method will panic if index is below zero or if
 // the index is greater than or equal to the list size.
-func (itr *ListIterator) Seek(index int) {
+func (itr *ListIterator[T]) Seek(index int) {
 	// Panic similar to Go slices.
 	if index < 0 || index >= itr.list.Len() {
 		panic(fmt.Sprintf("immutable.ListIterator.Seek: index %d out of bounds", index))
@@ -574,22 +580,23 @@ func (itr *ListIterator) Seek(index int) {
 	itr.index = index
 
 	// Reset to the bottom of the stack at seek to the correct position.
-	itr.stack[0] = listIteratorElem{node: itr.list.root}
+	itr.stack[0] = listIteratorElem[T]{node: itr.list.root}
 	itr.depth = 0
 	itr.seek(index)
 }
 
 // Next returns the current index and its value & moves the iterator forward.
 // Returns an index of -1 if the there are no more elements to return.
-func (itr *ListIterator) Next() (index int, value interface{}) {
+func (itr *ListIterator[T]) Next() (index int, value T) {
 	// Exit immediately if there are no elements remaining.
+	var empty T
 	if itr.Done() {
-		return -1, nil
+		return -1, empty
 	}
 
 	// Retrieve current index & value.
 	elem := &itr.stack[itr.depth]
-	index, value = itr.index, elem.node.(*listLeafNode).children[elem.index]
+	index, value = itr.index, elem.node.(*listLeafNode[T]).children[elem.index]
 
 	// Increase index. If index is at the end then return immediately.
 	itr.index++
@@ -609,15 +616,16 @@ func (itr *ListIterator) Next() (index int, value interface{}) {
 
 // Prev returns the current index and value and moves the iterator backward.
 // Returns an index of -1 if the there are no more elements to return.
-func (itr *ListIterator) Prev() (index int, value interface{}) {
+func (itr *ListIterator[T]) Prev() (index int, value T) {
 	// Exit immediately if there are no elements remaining.
+	var empty T
 	if itr.Done() {
-		return -1, nil
+		return -1, empty
 	}
 
 	// Retrieve current index & value.
 	elem := &itr.stack[itr.depth]
-	index, value = itr.index, elem.node.(*listLeafNode).children[elem.index]
+	index, value = itr.index, elem.node.(*listLeafNode[T]).children[elem.index]
 
 	// Decrease index. If index is past the beginning then return immediately.
 	itr.index--
@@ -637,26 +645,26 @@ func (itr *ListIterator) Prev() (index int, value interface{}) {
 
 // seek positions the stack to the given index from the current depth.
 // Elements and indexes below the current depth are assumed to be correct.
-func (itr *ListIterator) seek(index int) {
+func (itr *ListIterator[T]) seek(index int) {
 	// Iterate over each level until we reach a leaf node.
 	for {
 		elem := &itr.stack[itr.depth]
 		elem.index = ((itr.list.origin + index) >> (elem.node.depth() * listNodeBits)) & listNodeMask
 
 		switch node := elem.node.(type) {
-		case *listBranchNode:
+		case *listBranchNode[T]:
 			child := node.children[elem.index]
-			itr.stack[itr.depth+1] = listIteratorElem{node: child}
+			itr.stack[itr.depth+1] = listIteratorElem[T]{node: child}
 			itr.depth++
-		case *listLeafNode:
+		case *listLeafNode[T]:
 			return
 		}
 	}
 }
 
 // listIteratorElem represents the node and it's child index within the stack.
-type listIteratorElem struct {
-	node  listNode
+type listIteratorElem[T comparable] struct {
+	node  listNode[T]
 	index int
 }
 
