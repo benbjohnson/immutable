@@ -1,7 +1,24 @@
 Immutable ![release](https://img.shields.io/github/release/benbjohnson/immutable.svg) ![test](https://github.com/benbjohnson/immutable/workflows/test/badge.svg) ![coverage](https://img.shields.io/codecov/c/github/benbjohnson/immutable/master.svg) ![license](https://img.shields.io/github/license/benbjohnson/immutable.svg)
 =========
 
-This repository contains immutable collection types for Go. It includes
+**NOTE this fork converts Ben's immutable types with generics**
+
+NOTES and open points:
+ * List was easier to port. No major changes
+ * exp/constraints.Ordered is used for maps - this was mainly for the SortedMap support
+ * existing hashing / comparison functions are used, but adjusted
+ * BREAKING CHANGE: byte slices are no longer supported as hash keys, because of the Ordered constraint. Use a string()
+ * I don't know the best way to arrange the go mod. Should it be PR'd back to benjohnson/immutable/v2?
+ * I don't know if there's a better way to design the API with more changes - I've gone for minimal changes to the approach.
+   * e.g. could we be using hash/maphash now? I tried but tests failed
+ * WARNING: I did a LOT of repetetive fiddly changes here, and I may have messed up. Use with caution.
+
+ -------
+
+## Original docs (modified)
+
+
+This repository contains *generic* immutable collection types for Go. It includes
 `List`, `Map`, and `SortedMap` implementations. Immutable collections can
 provide efficient, lock free sharing of data by requiring that edits to the
 collections return new collections.
@@ -34,7 +51,7 @@ prepending is as efficient as appending.
 
 ```go
 // Create a list with 3 elements.
-l := immutable.NewList()
+l := immutable.NewList[string]()
 l = l.Append("foo")
 l = l.Append("bar")
 l = l.Prepend("baz")
@@ -46,7 +63,7 @@ fmt.Println(l.Get(2)) // "bar"
 ```
 
 Note that each change to the list results in a new list being created. These
-lists are all snapshots at that point in time and cannot be changed so they 
+lists are all snapshots at that point in time and cannot be changed so they
 are safe to share between multiple goroutines.
 
 ### Updating list elements
@@ -57,7 +74,7 @@ new list to a new variable. You can see that our old `l` variable retains a
 snapshot of the original value.
 
 ```go
-l := immutable.NewList()
+l := immutable.NewList[string]()
 l = l.Append("foo")
 l = l.Append("bar")
 newList := l.Set(2, "baz")
@@ -95,7 +112,7 @@ Below is an example of iterating over all elements of our list from above:
 ```go
 itr := l.Iterator()
 for !itr.Done() {
-	index, value := itr.Next()
+	index, value, _ := itr.Next()
 	fmt.Printf("Index %d equals %v\n", index, value)
 }
 
@@ -115,7 +132,7 @@ a list in-place until you are ready to use it. This can improve bulk list
 building by 10x or more.
 
 ```go
-b := immutable.NewListBuilder()
+b := immutable.NewListBuilder[string]()
 b.Append("foo")
 b.Append("bar")
 b.Set(2, "baz")
@@ -151,7 +168,7 @@ the value as well as a flag indicating if the key existed. The flag is useful
 to check if a `nil` value was set for a key versus a key did not exist.
 
 ```go
-m := immutable.NewMap(nil)
+m := immutable.NewMap[string,int](nil)
 m = m.Set("jane", 100)
 m = m.Set("susy", 200)
 m = m.Set("jane", 300) // overwrite
@@ -175,7 +192,7 @@ Keys may be removed from the map by using the `Delete()` method. If the key does
 not exist then the original map is returned instead of a new one.
 
 ```go
-m := immutable.NewMap(nil)
+m := immutable.NewMap[string,int](nil)
 m = m.Set("jane", 100)
 m = m.Delete("jane")
 
@@ -193,7 +210,7 @@ pairs in the collection. Unlike Go maps, iterators are deterministic when
 iterating over key/value pairs.
 
 ```go
-m := immutable.NewMap(nil)
+m := immutable.NewMap[string,int](nil)
 m = m.Set("jane", 100)
 m = m.Set("susy", 200)
 
@@ -215,11 +232,11 @@ keys generate the same hash.
 ### Efficiently building maps
 
 If you are executing multiple mutations on a map, it can be much more efficient
-to use the `MapBuilder`. It uses nearly the same API as `Map` except that it 
-updates a map in-place until you are ready to use it. 
+to use the `MapBuilder`. It uses nearly the same API as `Map` except that it
+updates a map in-place until you are ready to use it.
 
 ```go
-b := immutable.NewMapBuilder(nil)
+b := immutable.NewMapBuilder[string,int](nil)
 b.Set("foo", 100)
 b.Set("bar", 200)
 b.Set("foo", 300)
@@ -242,9 +259,9 @@ Hashers are fairly simple. They only need to generate hashes for a given key
 and check equality given two keys.
 
 ```go
-type Hasher interface {
-	Hash(key interface{}) uint32
-	Equal(a, b interface{}) bool
+type Hasher[K constraints.Ordered] interface {
+	Hash(key K) uint32
+	Equal(a, b K) bool
 }
 ```
 
@@ -278,8 +295,8 @@ Comparers on have one method—`Compare()`. It works the same as the
 `1` if a is greater than `b`, and returns `0` if `a` is equal to `b`.
 
 ```go
-type Comparer interface {
-	Compare(a, b interface{}) int
+type Comparer[K constraints.Ordered] interface {
+	Compare(a, b K) int
 }
 ```
 

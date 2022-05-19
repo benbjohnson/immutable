@@ -2501,11 +2501,11 @@ func (h *mockHasher[K]) Equal(a, b K) bool {
 }
 
 // mockComparer represents a mock implementation of immutable.Comparer.
-type mockComparer struct {
-	compare func(a, b interface{}) int
+type mockComparer[K constraints.Ordered] struct {
+	compare func(a, b K) int
 }
 
 // Compare executes the mocked CompreFn function.
-func (h *mockComparer) Compare(a, b interface{}) int {
+func (h *mockComparer[K]) Compare(a, b K) int {
 	return h.compare(a, b)
 }
