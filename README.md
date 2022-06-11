@@ -1,23 +1,6 @@
 Immutable ![release](https://img.shields.io/github/release/benbjohnson/immutable.svg) ![test](https://github.com/benbjohnson/immutable/workflows/test/badge.svg) ![coverage](https://img.shields.io/codecov/c/github/benbjohnson/immutable/master.svg) ![license](https://img.shields.io/github/license/benbjohnson/immutable.svg)
 =========
 
-**NOTE this fork converts Ben's immutable types with generics**
-
-NOTES and open points:
- * List was easier to port. No major changes
- * exp/constraints.Ordered is used for maps - this was mainly for the SortedMap support
- * existing hashing / comparison functions are used, but adjusted
- * BREAKING CHANGE: byte slices are no longer supported as hash keys, because of the Ordered constraint. Use a string()
- * I don't know the best way to arrange the go mod. Should it be PR'd back to benjohnson/immutable/v2?
- * I don't know if there's a better way to design the API with more changes - I've gone for minimal changes to the approach.
-   * e.g. could we be using hash/maphash now? I tried but tests failed
- * WARNING: I did a LOT of repetetive fiddly changes here, and I may have messed up. Use with caution.
-
- -------
-
-## Original docs (modified)
-
-
 This repository contains *generic* immutable collection types for Go. It includes
 `List`, `Map`, and `SortedMap` implementations. Immutable collections can
 provide efficient, lock free sharing of data by requiring that edits to the
