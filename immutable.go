@@ -2215,14 +2215,14 @@ type Hasher[K constraints.Ordered] interface {
 func NewHasher[K constraints.Ordered](key K) Hasher[K] {
 	// Attempt to use non-reflection based hasher first.
 	switch (any(key)).(type) {
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, string:
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, uintptr, string:
 		return &defaultHasher[K]{}
 	}
 
 	// Fallback to reflection-based hasher otherwise.
 	// This is used when caller wraps a type around a primitive type.
 	switch reflect.TypeOf(key).Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.String:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.String:
 		return &reflectHasher[K]{}
 	}
 
@@ -2248,7 +2248,7 @@ func (h *reflectHasher[K]) Hash(key K) uint32 {
 	switch reflect.TypeOf(key).Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return hashUint64(uint64(reflect.ValueOf(key).Int()))
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		return hashUint64(reflect.ValueOf(key).Uint())
 	case reflect.String:
 		var hash uint32
@@ -2267,7 +2267,7 @@ func (h *reflectHasher[K]) Equal(a, b K) bool {
 	switch reflect.TypeOf(a).Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return reflect.ValueOf(a).Int() == reflect.ValueOf(b).Int()
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		return reflect.ValueOf(a).Uint() == reflect.ValueOf(b).Uint()
 	case reflect.String:
 		return reflect.ValueOf(a).String() == reflect.ValueOf(b).String()
@@ -2293,7 +2293,6 @@ type defaultHasher[K constraints.Ordered] struct{}
 func (h *defaultHasher[K]) Hash(key K) uint32 {
 	// Attempt to use non-reflection based hasher first.
 	switch x := (any(key)).(type) {
-	// int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 	case int:
 		return hashUint64(uint64(x))
 	case int8:
@@ -2339,13 +2338,13 @@ type Comparer[K constraints.Ordered] interface {
 func NewComparer[K constraints.Ordered](key K) Comparer[K] {
 	// Attempt to use non-reflection based comparer first.
 	switch (any(key)).(type) {
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, string:
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, uintptr, string:
 		return &defaultComparer[K]{}
 	}
 	// Fallback to reflection-based comparer otherwise.
 	// This is used when caller wraps a type around a primitive type.
 	switch reflect.TypeOf(key).Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.String:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.String:
 		return &reflectComparer[K]{}
 	}
 	// If no comparers match then panic.
@@ -2381,7 +2380,7 @@ func (c *reflectComparer[K]) Compare(a, b K) int {
 			return 1
 		}
 		return 0
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if i, j := reflect.ValueOf(a).Uint(), reflect.ValueOf(b).Uint(); i < j {
 			return -1
 		} else if i > j {

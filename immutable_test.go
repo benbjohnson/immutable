@@ -988,37 +988,6 @@ func TestMap_Set(t *testing.T) {
 			t.Fatalf("expected no value: <%v,%v>", v, ok)
 		}
 	})
-	/*
-			t.Run("ByteSliceKeys", func(t *testing.T) {
-				m := NewMap[[]byte, string](nil)
-				m = m.Set([]byte("foo"), "bar")
-				m = m.Set([]byte("baz"), "bat")
-				m = m.Set([]byte(""), "EMPTY")
-				if v, ok := m.Get([]byte("foo")); !ok || v != "bar" {
-					t.Fatalf("unexpected value: <%v,%v>", v, ok)
-				} else if v, ok := m.Get([]byte("baz")); !ok || v != "bat" {
-					t.Fatalf("unexpected value: <%v,%v>", v, ok)
-				} else if v, ok := m.Get([]byte("")); !ok || v != "EMPTY" {
-					t.Fatalf("unexpected value: <%v,%v>", v, ok)
-				}
-				if v, ok := m.Get([]byte("no_such_key")); ok {
-					t.Fatalf("expected no value: <%v,%v>", v, ok)
-				}
-			})
-
-		t.Run("NoDefaultHasher", func(t *testing.T) {
-			type T struct{}
-			var r string
-			func() {
-				defer func() { r = recover().(string) }()
-				m := NewMap[T, string](nil)
-				m = m.Set(T{}, "bar")
-			}()
-			if r != `immutable.NewHasher: must set hasher for immutable.T type` {
-				t.Fatalf("unexpected panic: %q", r)
-			}
-		})
-	*/
 
 	RunRandom(t, "Random", func(t *testing.T, rand *rand.Rand) {
 		m := NewTestMap()
@@ -1813,36 +1782,17 @@ func TestSortedMap_Set(t *testing.T) {
 		}
 	})
 
-	/*
-		t.Run("ByteSliceKeys", func(t *testing.T) {
-			m := NewSortedMap[int, int](nil)
-			m = m.Set([]byte("foo"), "bar")
-			m = m.Set([]byte("baz"), "bat")
-			m = m.Set([]byte(""), "EMPTY")
-			if v, ok := m.Get([]byte("foo")); !ok || v != "bar" {
-				t.Fatalf("unexpected value: <%v,%v>", v, ok)
-			} else if v, ok := m.Get([]byte("baz")); !ok || v != "bat" {
-				t.Fatalf("unexpected value: <%v,%v>", v, ok)
-			} else if v, ok := m.Get([]byte("")); !ok || v != "EMPTY" {
-				t.Fatalf("unexpected value: <%v,%v>", v, ok)
-			}
-			if v, ok := m.Get([]byte("no_such_key")); ok {
-				t.Fatalf("expected no value: <%v,%v>", v, ok)
-			}
-		})
-
-		t.Run("NoDefaultComparer", func(t *testing.T) {
-			var r string
-			func() {
-				defer func() { r = recover().(string) }()
-				m := NewSortedMap[int, int](nil)
-				m = m.Set(float64(100), "bar")
-			}()
-			if r != `immutable.NewComparer: must set comparer for float64 type` {
-				t.Fatalf("unexpected panic: %q", r)
-			}
-		})
-	*/
+	t.Run("NoDefaultComparer", func(t *testing.T) {
+		var r string
+		func() {
+			defer func() { r = recover().(string) }()
+			m := NewSortedMap[float64, string](nil)
+			m = m.Set(float64(100), "bar")
+		}()
+		if r != `immutable.NewComparer: must set comparer for float64 type` {
+			t.Fatalf("unexpected panic: %q", r)
+		}
+	})
 
 	RunRandom(t, "Random", func(t *testing.T, rand *rand.Rand) {
 		m := NewTSortedMap()
