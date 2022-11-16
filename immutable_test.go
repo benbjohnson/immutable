@@ -180,6 +180,47 @@ func TestList(t *testing.T) {
 		}
 	})
 
+	t.Run("TestSliceFreesReferences", func(t *testing.T) {
+		/* Test that the leaf node in a sliced list contains zero'ed entries at
+		 * the correct positions. To do this we directly access the internal
+		 * tree structure of the list.
+		 */
+		l := NewList[*int]()
+		var ints [5]int
+		for i := 0; i < 5; i++ {
+			l = l.Append(&ints[i])
+		}
+		sl := l.Slice(2, 4)
+
+		var findLeaf func(listNode[*int]) *listLeafNode[*int]
+		findLeaf = func(n listNode[*int]) *listLeafNode[*int] {
+			switch n := n.(type) {
+			case *listBranchNode[*int]:
+				if n.children[0] == nil {
+					t.Fatal("Failed to find leaf node due to nil child")
+				}
+				return findLeaf(n.children[0])
+			case *listLeafNode[*int]: return n
+			default: panic("Unexpected case")
+			}
+		}
+
+		leaf := findLeaf(sl.root)
+		if leaf.occupied != 0b1100 {
+			t.Errorf("Expected occupied to be 1100, was %032b", leaf.occupied)
+		}
+
+		for i := 0; i < listNodeSize; i++ {
+			if 2 <= i && i < 4 {
+				if leaf.children[i] != &ints[i] {
+					t.Errorf("Position %v does not contain the right pointer?", i)
+				}
+			} else if leaf.children[i] != nil {
+				t.Errorf("Expected position %v to be cleared, was %v", i, leaf.children[i])
+			}
+		}
+	})
+
 	RunRandom(t, "Random", func(t *testing.T, rand *rand.Rand) {
 		l := NewTList()
 		for i := 0; i < 100000; i++ {

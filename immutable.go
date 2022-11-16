@@ -55,14 +55,14 @@ import (
 // in Go. They can be updated by appending to the end of the list, prepending
 // values to the beginning of the list, or updating existing indexes in the
 // list.
-type List[T comparable] struct {
+type List[T any] struct {
 	root   listNode[T] // root node
 	origin int         // offset to zero index element
 	size   int         // total number of elements in use
 }
 
 // NewList returns a new empty instance of List.
-func NewList[T comparable]() *List[T] {
+func NewList[T any]() *List[T] {
 	return &List[T]{
 		root: &listLeafNode[T]{},
 	}
@@ -226,12 +226,12 @@ func (l *List[T]) Iterator() *ListIterator[T] {
 }
 
 // ListBuilder represents an efficient builder for creating new Lists.
-type ListBuilder[T comparable] struct {
+type ListBuilder[T any] struct {
 	list *List[T] // current state
 }
 
 // NewListBuilder returns a new instance of ListBuilder.
-func NewListBuilder[T comparable]() *ListBuilder[T] {
+func NewListBuilder[T any]() *ListBuilder[T] {
 	return &ListBuilder[T]{list: NewList[T]()}
 }
 
@@ -298,7 +298,7 @@ const (
 )
 
 // listNode represents either a branch or leaf node in a List.
-type listNode[T comparable] interface {
+type listNode[T any] interface {
 	depth() uint
 	get(index int) T
 	set(index int, v T, mutable bool) listNode[T]
@@ -311,7 +311,7 @@ type listNode[T comparable] interface {
 }
 
 // newListNode returns a leaf node for depth zero, otherwise returns a branch node.
-func newListNode[T comparable](depth uint) listNode[T] {
+func newListNode[T any](depth uint) listNode[T] {
 	if depth == 0 {
 		return &listLeafNode[T]{}
 	}
@@ -319,7 +319,7 @@ func newListNode[T comparable](depth uint) listNode[T] {
 }
 
 // listBranchNode represents a branch of a List tree at a given depth.
-type listBranchNode[T comparable] struct {
+type listBranchNode[T any] struct {
 	d        uint // depth
 	children [listNodeSize]listNode[T]
 }
@@ -446,8 +446,10 @@ func (n *listBranchNode[T]) deleteAfter(index int, mutable bool) listNode[T] {
 }
 
 // listLeafNode represents a leaf node in a List.
-type listLeafNode[T comparable] struct {
+type listLeafNode[T any] struct {
 	children [listNodeSize]T
+	// bitset with ones at occupied positions, position 0 is the LSB
+	occupied uint32
 }
 
 // depth always returns 0 for leaf nodes.
@@ -469,33 +471,21 @@ func (n *listLeafNode[T]) set(index int, v T, mutable bool) listNode[T] {
 		other = &tmp
 	}
 	other.children[idx] = v
-	var otherLN listNode[T]
-	otherLN = other
-	return otherLN
+	other.occupied |= 1 << idx
+	return other
 }
 
 // containsBefore returns true if non-nil values exists between [0,index).
 func (n *listLeafNode[T]) containsBefore(index int) bool {
 	idx := index & listNodeMask
-	var empty T
-	for i := 0; i < idx; i++ {
-		if n.children[i] != empty {
-			return true
-		}
-	}
-	return false
+	return bits.TrailingZeros32(n.occupied) < idx
 }
 
 // containsAfter returns true if non-nil values exists between (index,listNodeSize).
 func (n *listLeafNode[T]) containsAfter(index int) bool {
 	idx := index & listNodeMask
-	var empty T
-	for i := idx + 1; i < len(n.children); i++ {
-		if n.children[i] != empty {
-			return true
-		}
-	}
-	return false
+	lastSetPos := 31 - bits.LeadingZeros32(n.occupied)
+	return lastSetPos > idx
 }
 
 // deleteBefore returns a new node with all elements before index removed.
@@ -513,13 +503,15 @@ func (n *listLeafNode[T]) deleteBefore(index int, mutable bool) listNode[T] {
 			other.children[i] = empty
 		}
 	} else {
-		other = &listLeafNode[T]{}
+		other = &listLeafNode[T]{occupied: n.occupied}
 		copy(other.children[idx:][:], n.children[idx:][:])
 	}
+	// Set the first idx bits to 0.
+	other.occupied &= ^((1 << idx)-1)
 	return other
 }
 
-// deleteBefore returns a new node with all elements before index removed.
+// deleteAfter returns a new node with all elements after index removed.
 func (n *listLeafNode[T]) deleteAfter(index int, mutable bool) listNode[T] {
 	if !n.containsAfter(index) {
 		return n
@@ -534,14 +526,16 @@ func (n *listLeafNode[T]) deleteAfter(index int, mutable bool) listNode[T] {
 			other.children[i] = empty
 		}
 	} else {
-		other = &listLeafNode[T]{}
+		other = &listLeafNode[T]{occupied: n.occupied}
 		copy(other.children[:idx+1][:], n.children[:idx+1][:])
 	}
+	// Set bits after idx to 0. idx < 31 because n.containsAfter(index) == true.
+	other.occupied &= (1 << (idx+1))-1
 	return other
 }
 
 // ListIterator represents an ordered iterator over a list.
-type ListIterator[T comparable] struct {
+type ListIterator[T any] struct {
 	list  *List[T] // source list
 	index int      // current index position
 
@@ -664,7 +658,7 @@ func (itr *ListIterator[T]) seek(index int) {
 }
 
 // listIteratorElem represents the node and it's child index within the stack.
-type listIteratorElem[T comparable] struct {
+type listIteratorElem[T any] struct {
 	node  listNode[T]
 	index int
 }
