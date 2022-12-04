@@ -2234,7 +2234,7 @@ func hashString(value string) uint32 {
 	return hash
 }
 
-// reflectIntHasher implements a reflection-based Hasher for int keys.
+// reflectIntHasher implements a reflection-based Hasher for keys.
 type reflectHasher[K comparable] struct{}
 
 // Hash returns a hash for key.
@@ -2256,7 +2256,7 @@ func (h *reflectHasher[K]) Hash(key K) uint32 {
 }
 
 // Equal returns true if a is equal to b. Otherwise returns false.
-// Panics if a and b are not ints.
+// Panics if a and b are not int-ish or string-ish.
 func (h *reflectHasher[K]) Equal(a, b K) bool {
 	switch reflect.TypeOf(a).Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -2348,11 +2348,11 @@ func NewComparer[K comparable](key K) Comparer[K] {
 	panic(fmt.Sprintf("immutable.NewComparer: must set comparer for %T type", key))
 }
 
-// defaultComparer compares two integers. Implements Comparer.
+// defaultComparer compares two values (int-ish and string-ish types are supported. Implements Comparer.
 type defaultComparer[K comparable] struct{}
 
 // Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
-// returns 0 if a is equal to b. Panic if a or b is not a constraints.Ordered type
+// returns 0 if a is equal to b. Panic if a or b is not a string or int* type
 func (c *defaultComparer[K]) Compare(i K, j K) int {
 	switch x := (any(i)).(type) {
 	case int:
@@ -2394,11 +2394,11 @@ func defaultCompare[K constraints.Ordered](i, j K) int {
 	return 0
 }
 
-// reflectIntComparer compares two int values using reflection. Implements Comparer.
+// reflectIntComparer compares two values using reflection. Implements Comparer.
 type reflectComparer[K comparable] struct{}
 
 // Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
-// returns 0 if a is equal to b. Panic if a or b is not an int.
+// returns 0 if a is equal to b. Panic if a or b is not an int-ish or string-ish type.
 func (c *reflectComparer[K]) Compare(a, b K) int {
 	switch reflect.TypeOf(a).Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
