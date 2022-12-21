@@ -135,14 +135,9 @@ is implemented to act similarly to the built-in Go `map` type. It is implemented
 as a [Hash-Array Mapped Trie](https://lampwww.epfl.ch/papers/idealhashtrees.pdf).
 
 Maps require a `Hasher` to hash keys and check for equality. There are built-in
-hasher implementations for most primitive types such as `int`, `uint`, and 
+hasher implementations for most primitive types such as `int`, `uint`, and
 `string` keys. You may pass in a `nil` hasher to `NewMap()` if you are using
 one of these key types.
-
-Currently `[]byte` keys are not supported since Go doesn't included them in
-`constraints.Ordered` unline strings. For now `Ordered` constraint it used even
-for `Map` where key order is unimportant but this could be relaxed in the 
-future.
 
 ### Setting map key/value pairs
 
@@ -238,15 +233,15 @@ Builders are invalid after the call to `Map()`.
 
 ### Implementing a custom Hasher
 
-If you need to use a key type besides `int`, `uint`, or `string` then you'll 
-need to create a custom `Hasher` implementation and pass it to `NewMap()` on 
+If you need to use a key type besides `int`, `uint`, or `string` then you'll
+need to create a custom `Hasher` implementation and pass it to `NewMap()` on
 creation.
 
 Hashers are fairly simple. They only need to generate hashes for a given key
 and check equality given two keys.
 
 ```go
-type Hasher[K constraints.Ordered] interface {
+type Hasher[K comparable] interface {
 	Hash(key K) uint32
 	Equal(a, b K) bool
 }
@@ -263,12 +258,9 @@ Unlike the `Map`, however, keys can be iterated over in-order. It is implemented
 as a B+tree.
 
 Sorted maps require a `Comparer` to sort keys and check for equality. There are
-built-in comparer implementations for `int`, `uint`, and `string` keys. You may 
-pass a `nil` comparer to `NewSortedMap()` if you are using one of these key 
+built-in comparer implementations for `int`, `uint`, and `string` keys. You may
+pass a `nil` comparer to `NewSortedMap()` if you are using one of these key
 types.
-
-Currently `[]byte` keys are not supported since Go doesn't included them in
-`constraints.Ordered` unline strings.
 
 The API is identical to the `Map` implementation. The sorted map also has a
 companion `SortedMapBuilder` for more efficiently building maps.
@@ -276,7 +268,7 @@ companion `SortedMapBuilder` for more efficiently building maps.
 
 ### Implementing a custom Comparer
 
-If you need to use a key type besides `int`, `uint`, or `string` then you'll 
+If you need to use a key type besides `int`, `uint`, or `string` or derived types, then you'll
 need to create a custom `Comparer` implementation and pass it to
 `NewSortedMap()` on creation.
 
@@ -285,13 +277,12 @@ Comparers on have one method—`Compare()`. It works the same as the
 `1` if a is greater than `b`, and returns `0` if `a` is equal to `b`.
 
 ```go
-type Comparer[K constraints.Ordered] interface {
+type Comparer[K comparable] interface {
 	Compare(a, b K) int
 }
 ```
 
-Please see the internal `intComparer`, `uintComparer`, and `stringComparer` for
-examples.
+Please see the internal `defaultComparer` for an example, bearing in mind that it works for several types.
 
 
 
