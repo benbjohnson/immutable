@@ -62,10 +62,14 @@ type List[T any] struct {
 }
 
 // NewList returns a new empty instance of List.
-func NewList[T any]() *List[T] {
-	return &List[T]{
+func NewList[T any](values ...T) *List[T] {
+	l := &List[T]{
 		root: &listLeafNode[T]{},
 	}
+	for _, value := range values {
+		l.append(value, true)
+	}
+	return l
 }
 
 // clone returns a copy of the list.
@@ -113,8 +117,12 @@ func (l *List[T]) set(index int, value T, mutable bool) *List[T] {
 }
 
 // Append returns a new list with value added to the end of the list.
-func (l *List[T]) Append(value T) *List[T] {
-	return l.append(value, false)
+func (l *List[T]) Append(values ...T) *List[T] {
+	other := l.clone()
+	for _, value := range values {
+		other.append(value, true)
+	}
+	return other
 }
 
 func (l *List[T]) append(value T, mutable bool) *List[T] {
@@ -136,9 +144,13 @@ func (l *List[T]) append(value T, mutable bool) *List[T] {
 	return other
 }
 
-// Prepend returns a new list with value added to the beginning of the list.
-func (l *List[T]) Prepend(value T) *List[T] {
-	return l.prepend(value, false)
+// Prepend returns a new list with value(s) added to the beginning of the list.
+func (l *List[T]) Prepend(values ...T) *List[T] {
+	other := l.clone()
+	for i := len(values) - 1; i >= 0; i-- {
+		other.prepend(values[i], true)
+	}
+	return other
 }
 
 func (l *List[T]) prepend(value T, mutable bool) *List[T] {
