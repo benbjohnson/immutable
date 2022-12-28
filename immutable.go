@@ -1608,6 +1608,20 @@ func NewSortedMap[K comparable, V any](comparer Comparer[K]) *SortedMap[K, V] {
 	}
 }
 
+// NewSortedMapOf returns a new instance of SortedMap, containing a map of provided entries.
+//
+// If comparer is nil then a default comparer is set after the first key is inserted. Default comparers
+// exist for int, string, and byte slice keys.
+func NewSortedMapOf[K comparable, V any](comparer Comparer[K], entries map[K]V) *SortedMap[K, V] {
+	m := &SortedMap[K, V]{
+		comparer: comparer,
+	}
+	for k, v := range entries {
+		m.set(k, v, true)
+	}
+	return m
+}
+
 // Len returns the number of elements in the sorted map.
 func (m *SortedMap[K, V]) Len() int {
 	return m.size
@@ -1626,6 +1640,15 @@ func (m *SortedMap[K, V]) Get(key K) (V, bool) {
 // Set returns a copy of the map with the key set to the given value.
 func (m *SortedMap[K, V]) Set(key K, value V) *SortedMap[K, V] {
 	return m.set(key, value, false)
+}
+
+// SetMany returns a map with the keys set to the new values.
+func (m *SortedMap[K, V]) SetMany(entries map[K]V) *SortedMap[K, V] {
+	n := m.clone()
+	for k, v := range entries {
+		n.set(k, v, true)
+	}
+	return n
 }
 
 func (m *SortedMap[K, V]) set(key K, value V, mutable bool) *SortedMap[K, V] {
