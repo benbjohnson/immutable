@@ -4,22 +4,34 @@ type Set[T comparable] struct {
 	m *Map[T, struct{}]
 }
 
-func NewSet[T comparable](hasher Hasher[T]) Set[T] {
-	return Set[T]{
+func NewSet[T comparable](hasher Hasher[T], values ...T) Set[T] {
+	s := Set[T]{
 		m: NewMap[T, struct{}](hasher),
 	}
+	for _, value := range values {
+		s.m.set(value, struct{}{}, true)
+	}
+	return s
 }
 
-func (s Set[T]) Set(val T) Set[T] {
-	return Set[T]{
-		m: s.m.Set(val, struct{}{}),
+func (s Set[T]) Set(values ...T) Set[T] {
+	n := Set[T]{
+		m: s.m.clone(),
 	}
+	for _, value := range values {
+		n.m.set(value, struct{}{}, true)
+	}
+	return n
 }
 
-func (s Set[T]) Delete(val T) Set[T] {
-	return Set[T]{
-		m: s.m.Delete(val),
+func (s Set[T]) Delete(values ...T) Set[T] {
+	n := Set[T]{
+		m: s.m.clone(),
 	}
+	for _, value := range values {
+		n.m.delete(value, true)
+	}
+	return n
 }
 
 func (s Set[T]) Has(val T) bool {
@@ -82,22 +94,34 @@ type SortedSet[T comparable] struct {
 	m *SortedMap[T, struct{}]
 }
 
-func NewSortedSet[T comparable](comparer Comparer[T]) SortedSet[T] {
-	return SortedSet[T]{
+func NewSortedSet[T comparable](comparer Comparer[T], values ...T) SortedSet[T] {
+	s := SortedSet[T]{
 		m: NewSortedMap[T, struct{}](comparer),
 	}
+	for _, value := range values {
+		s.m.set(value, struct{}{}, true)
+	}
+	return s
 }
 
-func (s SortedSet[T]) Put(val T) SortedSet[T] {
-	return SortedSet[T]{
-		m: s.m.Set(val, struct{}{}),
+func (s SortedSet[T]) Set(values ...T) SortedSet[T] {
+	n := SortedSet[T]{
+		m: s.m.clone(),
 	}
+	for _, value := range values {
+		n.m.set(value, struct{}{}, true)
+	}
+	return n
 }
 
-func (s SortedSet[T]) Delete(val T) SortedSet[T] {
-	return SortedSet[T]{
-		m: s.m.Delete(val),
+func (s SortedSet[T]) Delete(values ...T) SortedSet[T] {
+	n := SortedSet[T]{
+		m: s.m.clone(),
 	}
+	for _, value := range values {
+		n.m.delete(value, true)
+	}
+	return n
 }
 
 func (s SortedSet[T]) Has(val T) bool {
