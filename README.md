@@ -2,7 +2,7 @@ Immutable ![release](https://img.shields.io/github/release/benbjohnson/immutable
 =========
 
 This repository contains *generic* immutable collection types for Go. It includes
-`List`, `Map`, and `SortedMap` implementations. Immutable collections can
+`List`, `Map`, `SortedMap`, `Set` and `SortedSet` implementations. Immutable collections can
 provide efficient, lock free sharing of data by requiring that edits to the
 collections return new collections.
 
@@ -284,6 +284,29 @@ type Comparer[K comparable] interface {
 
 Please see the internal `defaultComparer` for an example, bearing in mind that it works for several types.
 
+## Set
+
+The `Set` represents a collection of unique values. It uses a `map[T]struct{}`, so it carries over some characteristics from the built-in Go `map` type.
+Values neeed to be `comparable`.
+
+Like Maps, Sets require a `Hasher` to hash keys and check for equality. There are built-in
+hasher implementations for most primitive types such as `int`, `uint`, and
+`string` keys. You may pass in a `nil` hasher to `NewMap()` if you are using
+one of these key types.
+
+
+## Sorted Set
+
+The `SortedSet` represents a sorted collection of unique values.
+Unlike the `Set`, however, keys can be iterated over in-order. It is implemented
+as a B+tree.
+
+Sorted sets require a `Comparer` to sort values and check for equality. There are
+built-in comparer implementations for `int`, `uint`, and `string` keys. You may
+pass a `nil` comparer to `NewSortedSet()` if you are using one of these key
+types.
+
+The API is identical to the `Set` implementation.
 
 
 ## Contributing
