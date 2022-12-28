@@ -58,6 +58,17 @@ func (s Set[K]) Len() int {
 	return s.m.Len()
 }
 
+// Items returns a slice of the items inside the set
+func (s Set[T]) Items() []T {
+	r := make([]T, 0, s.Len())
+	itr := s.Iterator()
+	for !itr.Done() {
+		v, _ := itr.Next()
+		r = append(r, v)
+	}
+	return r
+}
+
 // Iterator returns a new iterator for this set positioned at the first value.
 func (s Set[T]) Iterator() *SetIterator[T] {
 	itr := &SetIterator[T]{mi: s.m.Iterator()}
@@ -164,6 +175,17 @@ func (s SortedSet[T]) Has(val T) bool {
 // Len returns the number of elements in the underlying map.
 func (s SortedSet[K]) Len() int {
 	return s.m.Len()
+}
+
+// Items returns a slice of the items inside the set
+func (s SortedSet[T]) Items() []T {
+	r := make([]T, 0, s.Len())
+	itr := s.Iterator()
+	for !itr.Done() {
+		v, _ := itr.Next()
+		r = append(r, v)
+	}
+	return r
 }
 
 // Iterator returns a new iterator for this set positioned at the first value.
