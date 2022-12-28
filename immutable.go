@@ -230,6 +230,39 @@ func (l *List[T]) slice(start, end int, mutable bool) *List[T] {
 	return other
 }
 
+// Filter returns a new List containing only the items matched by t
+func (l *List[T]) Filter(t func(T) bool) *List[T] {
+	n := NewList[T]()
+	itr := l.Iterator()
+	for !itr.Done() {
+		_, value := itr.Next()
+		if t(value) {
+			n.append(value, true)
+		}
+	}
+	return n
+}
+
+// Map returns a new List containing items as t(value)
+func (l *List[T]) Map(t func(T) T) *List[T] {
+	n := NewList[T]()
+	itr := l.Iterator()
+	for !itr.Done() {
+		_, value := itr.Next()
+		n.append(t(value), true)
+	}
+	return n
+}
+
+// Each performs a func for each item in a list
+func (l *List[T]) Each(t func(T)) {
+	itr := l.Iterator()
+	for !itr.Done() {
+		_, value := itr.Next()
+		t(value)
+	}
+}
+
 // Iterator returns a new iterator for this list positioned at the first index.
 func (l *List[T]) Iterator() *ListIterator[T] {
 	itr := &ListIterator[T]{list: l}
