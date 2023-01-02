@@ -51,7 +51,7 @@ func TestSetsDelete(t *testing.T) {
 
 func TestSortedSetsPut(t *testing.T) {
 	s := NewSortedSet[string](nil)
-	s2 := s.Put("1").Put("1").Put("0")
+	s2 := s.Set("1").Set("1").Set("0")
 	if s.Len() != 0 {
 		t.Fatalf("Unexpected mutation of set")
 	}
@@ -85,7 +85,7 @@ func TestSortedSetsPut(t *testing.T) {
 
 func TestSortedSetsDelete(t *testing.T) {
 	s := NewSortedSet[string](nil)
-	s2 := s.Put("1")
+	s2 := s.Set("1")
 	s3 := s.Delete("1")
 	if s2.Len() != 1 {
 		t.Fatalf("Unexpected non-mutation of set")

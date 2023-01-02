@@ -200,8 +200,10 @@ func TestList(t *testing.T) {
 					t.Fatal("Failed to find leaf node due to nil child")
 				}
 				return findLeaf(n.children[0])
-			case *listLeafNode[*int]: return n
-			default: panic("Unexpected case")
+			case *listLeafNode[*int]:
+				return n
+			default:
+				panic("Unexpected case")
 			}
 		}
 
@@ -959,6 +961,22 @@ func TestMap_Set(t *testing.T) {
 		}
 	})
 
+	t.Run("Multi", func(t *testing.T) {
+		m := NewMapOf(nil, map[int]string{1: "foo"})
+		itr := m.Iterator()
+		if itr.Done() {
+			t.Fatal("MapIterator.Done()=false, expected true")
+		}
+		if k, v, ok := itr.Next(); !ok {
+			t.Fatalf("MapIterator.Next()!=ok, expected ok")
+		} else if k != 1 || v != "foo" {
+			t.Fatalf("MapIterator.Next()=<%v,%v>, expected <1, \"foo\">", k, v)
+		}
+		if k, v, ok := itr.Next(); ok {
+			t.Fatalf("MapIterator.Next()=<%v,%v>, expected nil", k, v)
+		}
+	})
+
 	t.Run("VerySmall", func(t *testing.T) {
 		const n = 6
 		m := NewMap[int, int](nil)
@@ -1070,6 +1088,16 @@ func TestMap_Overwrite(t *testing.T) {
 			t.Fatalf("Get(%d)=<%v,%v>", i, v, ok)
 		}
 	}
+
+	t.Run("Simple", func(t *testing.T) {
+		m := NewMap[int, string](nil)
+		itr := m.Iterator()
+		if !itr.Done() {
+			t.Fatal("MapIterator.Done()=true, expected false")
+		} else if k, v, ok := itr.Next(); ok {
+			t.Fatalf("MapIterator.Next()=<%v,%v>, expected nil", k, v)
+		}
+	})
 }
 
 func TestMap_Delete(t *testing.T) {
