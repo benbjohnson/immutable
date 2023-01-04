@@ -230,36 +230,60 @@ func (l *List[T]) slice(start, end int, mutable bool) *List[T] {
 	return other
 }
 
-// Filter returns a new List containing only the items matched by t
-func (l *List[T]) Filter(t func(T) bool) *List[T] {
+// Filter returns a new List containing only the items matched by f
+func (l *List[T]) Filter(f func(T) bool) *List[T] {
 	n := NewList[T]()
 	itr := l.Iterator()
 	for !itr.Done() {
 		_, value := itr.Next()
-		if t(value) {
+		if f(value) {
 			n.append(value, true)
 		}
 	}
 	return n
 }
 
-// Map returns a new List containing items as t(value)
-func (l *List[T]) Map(t func(T) T) *List[T] {
+// Map returns a new List based on the result of the mapper for each element
+func (l *List[T]) Map(mapper func(T, int) T) *List[T] {
 	n := NewList[T]()
 	itr := l.Iterator()
 	for !itr.Done() {
-		_, value := itr.Next()
-		n.append(t(value), true)
+		idx, value := itr.Next()
+		n.append(mapper(value, idx), true)
 	}
 	return n
 }
 
-// Each performs a func for each item in a list
-func (l *List[T]) Each(t func(T)) {
+// FlatMap returns a new List based on the result of the mapper for each element
+func (l *List[T]) FlatMap(mapper func(T, int) []T) *List[T] {
+	n := NewList[T]()
 	itr := l.Iterator()
 	for !itr.Done() {
-		_, value := itr.Next()
-		t(value)
+		idx, value := itr.Next()
+		vs := mapper(value, idx)
+		for _, v := range vs {
+			n.append(v, true)
+		}
+	}
+	return n
+}
+
+// Reduce returns a single item, accumulated by running mapper on each element
+func (l *List[T]) Reduce(mapper func(T, T, int) T, acc T) T {
+	itr := l.Iterator()
+	for !itr.Done() {
+		idx, value := itr.Next()
+		acc = mapper(value, acc, idx)
+	}
+	return acc
+}
+
+// ForEach performs a func for each item in a list
+func (l *List[T]) ForEach(t func(T, int)) {
+	itr := l.Iterator()
+	for !itr.Done() {
+		idx, value := itr.Next()
+		t(value, idx)
 	}
 }
 
@@ -864,6 +888,55 @@ func (m *Map[K, V]) Iterator() *MapIterator[K, V] {
 	itr := &MapIterator[K, V]{m: m}
 	itr.First()
 	return itr
+}
+
+// Filter returns a new Map containing only the items matched by f
+func (m *Map[K, V]) Filter(f func(K, V) bool) *Map[K, V] {
+	n := NewMap[K, V](m.hasher)
+	itr := m.Iterator()
+	for !itr.Done() {
+		k, v, _ := itr.Next()
+		if f(k, v) {
+			n.set(k, v, true)
+		}
+	}
+	return n
+}
+
+// Map returns a new List based on the result of the mapper for each element
+func (m *Map[K, V]) Map(mapper func(K, V) (K, V)) *Map[K, V] {
+	n := NewMap[K, V](m.hasher)
+	itr := m.Iterator()
+	for !itr.Done() {
+		k, v, _ := itr.Next()
+		k, v = mapper(k, v)
+		n.set(k, v, true)
+	}
+	return n
+}
+
+type MapEntry[K comparable, V any] struct {
+	K K
+	V V
+}
+
+// Reduce returns a single item, accumulated by running mapper on each element
+func (m *Map[K, V]) Reduce(mapper func(K, V, MapEntry[K, V]) MapEntry[K, V], acc MapEntry[K, V]) MapEntry[K, V] {
+	itr := m.Iterator()
+	for !itr.Done() {
+		k, v, _ := itr.Next()
+		acc = mapper(k, v, acc)
+	}
+	return acc
+}
+
+// ForEach performs a func for each item in a list
+func (m *Map[K, V]) ForEach(t func(K, V)) {
+	itr := m.Iterator()
+	for !itr.Done() {
+		k, v, _ := itr.Next()
+		t(k, v)
+	}
 }
 
 // MapBuilder represents an efficient builder for creating Maps.

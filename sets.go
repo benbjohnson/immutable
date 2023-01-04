@@ -69,6 +69,49 @@ func (s Set[T]) Items() []T {
 	return r
 }
 
+// Filter returns a new Set containing only the items matched by f
+func (l Set[T]) Filter(f func(T) bool) Set[T] {
+	n := NewSet(l.m.hasher)
+	itr := l.Iterator()
+	for !itr.Done() {
+		value, _ := itr.Next()
+		if f(value) {
+			n.m.set(value, struct{}{}, true)
+		}
+	}
+	return n
+}
+
+// Map returns a new Set based on the result of the mapper for each element
+func (l Set[T]) Map(mapper func(T) T) Set[T] {
+	n := NewSet(l.m.hasher)
+	itr := l.Iterator()
+	for !itr.Done() {
+		value, _ := itr.Next()
+		n.m.set(mapper(value), struct{}{}, true)
+	}
+	return n
+}
+
+// Reduce returns a single item, accumulated by running mapper on each element
+func (l Set[T]) Reduce(mapper func(T, T) T, acc T) T {
+	itr := l.Iterator()
+	for !itr.Done() {
+		value, _ := itr.Next()
+		acc = mapper(value, acc)
+	}
+	return acc
+}
+
+// ForEach performs a func for each item in a list
+func (l Set[T]) ForEach(t func(T)) {
+	itr := l.Iterator()
+	for !itr.Done() {
+		value, _ := itr.Next()
+		t(value)
+	}
+}
+
 // Iterator returns a new iterator for this set positioned at the first value.
 func (s Set[T]) Iterator() *SetIterator[T] {
 	itr := &SetIterator[T]{mi: s.m.Iterator()}
@@ -186,6 +229,49 @@ func (s SortedSet[T]) Items() []T {
 		r = append(r, v)
 	}
 	return r
+}
+
+// Filter returns a new SortedSet containing only the items matched by f
+func (l SortedSet[T]) Filter(f func(T) bool) SortedSet[T] {
+	n := NewSortedSet(l.m.comparer)
+	itr := l.Iterator()
+	for !itr.Done() {
+		value, _ := itr.Next()
+		if f(value) {
+			n.m.set(value, struct{}{}, true)
+		}
+	}
+	return n
+}
+
+// Map returns a new SortedSet based on the result of the mapper for each element
+func (l SortedSet[T]) Map(mapper func(T) T) SortedSet[T] {
+	n := NewSortedSet(l.m.comparer)
+	itr := l.Iterator()
+	for !itr.Done() {
+		value, _ := itr.Next()
+		n.m.set(mapper(value), struct{}{}, true)
+	}
+	return n
+}
+
+// Reduce returns a single item, accumulated by running mapper on each element
+func (l SortedSet[T]) Reduce(mapper func(T, T) T, acc T) T {
+	itr := l.Iterator()
+	for !itr.Done() {
+		value, _ := itr.Next()
+		acc = mapper(value, acc)
+	}
+	return acc
+}
+
+// ForEach performs a func for each item in a list
+func (l SortedSet[T]) ForEach(t func(T)) {
+	itr := l.Iterator()
+	for !itr.Done() {
+		value, _ := itr.Next()
+		t(value)
+	}
 }
 
 // Iterator returns a new iterator for this set positioned at the first value.

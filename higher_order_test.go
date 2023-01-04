@@ -21,16 +21,16 @@ func TestHigherOrderList(t *testing.T) {
 		}
 	})
 
-	t.Run("each", func(t *testing.T) {
+	t.Run("foreach", func(t *testing.T) {
 		j := 0
-		l.Each(func(i int) { j += i })
+		l.ForEach(func(i int, idx int) { j += i })
 		if j != 6 {
 			t.Fatalf("Unexpected Each handling: %d", j)
 		}
 	})
 
 	t.Run("map", func(t *testing.T) {
-		m := l.Map(func(i int) int { return i + 1 })
+		m := l.Map(func(i int, idx int) int { return i + 1 })
 		if m.Len() != 3 {
 			t.Fatalf("Unexpected map result. expected 3, received %d", m.Len())
 		}
