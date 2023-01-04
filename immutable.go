@@ -903,7 +903,7 @@ func (m *Map[K, V]) Filter(f func(K, V) bool) *Map[K, V] {
 	return n
 }
 
-// Map returns a new List based on the result of the mapper for each element
+// Map returns a new Map based on the result of the mapper for each key/value pair
 func (m *Map[K, V]) Map(mapper func(K, V) (K, V)) *Map[K, V] {
 	n := NewMap[K, V](m.hasher)
 	itr := m.Iterator()
@@ -915,13 +915,8 @@ func (m *Map[K, V]) Map(mapper func(K, V) (K, V)) *Map[K, V] {
 	return n
 }
 
-type MapEntry[K comparable, V any] struct {
-	K K
-	V V
-}
-
-// Reduce returns a single item, accumulated by running mapper on each element
-func (m *Map[K, V]) Reduce(mapper func(K, V, MapEntry[K, V]) MapEntry[K, V], acc MapEntry[K, V]) MapEntry[K, V] {
+// Reduce returns a single value, accumulated by running mapper on each key/value pair
+func (m *Map[K, V]) Reduce(mapper func(K, V, V) V, acc V) V {
 	itr := m.Iterator()
 	for !itr.Done() {
 		k, v, _ := itr.Next()
@@ -930,7 +925,7 @@ func (m *Map[K, V]) Reduce(mapper func(K, V, MapEntry[K, V]) MapEntry[K, V], acc
 	return acc
 }
 
-// ForEach performs a func for each item in a list
+// ForEach performs a func for each key/value pair
 func (m *Map[K, V]) ForEach(t func(K, V)) {
 	itr := m.Iterator()
 	for !itr.Done() {
@@ -952,7 +947,7 @@ func NewMapBuilder[K comparable, V any](hasher Hasher[K]) *MapBuilder[K, V] {
 // Map returns the underlying map. Only call once.
 // Builder is invalid after call. Will panic on second invocation.
 func (b *MapBuilder[K, V]) Map() *Map[K, V] {
-	assert(b.m != nil, "immutable.SortedMapBuilder.Map(): duplicate call to fetch map")
+	assert(b.m != nil, "immutable.MapBuilder.Map(): duplicate call to fetch map")
 	m := b.m
 	b.m = nil
 	return m
@@ -1837,6 +1832,50 @@ func (m *SortedMap[K, V]) Iterator() *SortedMapIterator[K, V] {
 	itr := &SortedMapIterator[K, V]{m: m}
 	itr.First()
 	return itr
+}
+
+// Filter returns a new SortedMap containing only the items matched by f
+func (m *SortedMap[K, V]) Filter(f func(K, V) bool) *SortedMap[K, V] {
+	n := NewSortedMap[K, V](m.comparer)
+	itr := m.Iterator()
+	for !itr.Done() {
+		k, v, _ := itr.Next()
+		if f(k, v) {
+			n.set(k, v, true)
+		}
+	}
+	return n
+}
+
+// Map returns a new SortedMap based on the result of the mapper for each key/value pair
+func (m *SortedMap[K, V]) Map(mapper func(K, V) (K, V)) *SortedMap[K, V] {
+	n := NewSortedMap[K, V](m.comparer)
+	itr := m.Iterator()
+	for !itr.Done() {
+		k, v, _ := itr.Next()
+		k, v = mapper(k, v)
+		n.set(k, v, true)
+	}
+	return n
+}
+
+// Reduce returns a single value, accumulated by running mapper on each key/value pair
+func (m *SortedMap[K, V]) Reduce(mapper func(K, V, V) V, acc V) V {
+	itr := m.Iterator()
+	for !itr.Done() {
+		k, v, _ := itr.Next()
+		acc = mapper(k, v, acc)
+	}
+	return acc
+}
+
+// ForEach performs a func for each key/value pair
+func (m *SortedMap[K, V]) ForEach(t func(K, V)) {
+	itr := m.Iterator()
+	for !itr.Done() {
+		k, v, _ := itr.Next()
+		t(k, v)
+	}
 }
 
 // SortedMapBuilder represents an efficient builder for creating sorted maps.
