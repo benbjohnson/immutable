@@ -7,6 +7,7 @@ import (
 func TestSetsPut(t *testing.T) {
 	s := NewSet[string](nil)
 	s2 := s.Set("1").Set("1")
+	s2.Set("2")
 	if s.Len() != 0 {
 		t.Fatalf("Unexpected mutation of set")
 	}

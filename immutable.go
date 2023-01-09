@@ -757,11 +757,10 @@ func (m *Map[K, V]) Set(key K, value V) *Map[K, V] {
 // This function will return a new map even if the updated value is the same as
 // the existing value because Map does not track value equality.
 func (m *Map[K, V]) SetMany(entries map[K]V) *Map[K, V] {
-	n := m.clone()
 	for k, v := range entries {
-		n.set(k, v, true)
+		m = m.Set(k, v)
 	}
-	return n
+	return m
 }
 
 func (m *Map[K, V]) set(key K, value V, mutable bool) *Map[K, V] {
@@ -1644,11 +1643,10 @@ func (m *SortedMap[K, V]) Set(key K, value V) *SortedMap[K, V] {
 
 // SetMany returns a map with the keys set to the new values.
 func (m *SortedMap[K, V]) SetMany(entries map[K]V) *SortedMap[K, V] {
-	n := m.clone()
 	for k, v := range entries {
-		n.set(k, v, true)
+		m = m.Set(k, v)
 	}
-	return n
+	return m
 }
 
 func (m *SortedMap[K, V]) set(key K, value V, mutable bool) *SortedMap[K, V] {

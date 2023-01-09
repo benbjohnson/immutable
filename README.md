@@ -286,8 +286,8 @@ Please see the internal `defaultComparer` for an example, bearing in mind that i
 
 ## Set
 
-The `Set` represents a collection of unique values. It uses a `map[T]struct{}`, so it carries over some characteristics from the built-in Go `map` type.
-Values neeed to be `comparable`.
+The `Set` represents a collection of unique values, and it is implemented as a
+wrapper around a `Map[T, struct{}]`.
 
 Like Maps, Sets require a `Hasher` to hash keys and check for equality. There are built-in
 hasher implementations for most primitive types such as `int`, `uint`, and
