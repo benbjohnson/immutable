@@ -14,26 +14,18 @@ type Set[T comparable] struct {
 // Default hasher implementations only exist for int, string, and byte slice types.
 // NewSet can also take some initial values as varargs.
 func NewSet[T comparable](hasher Hasher[T], values ...T) Set[T] {
-	s := Set[T]{
-		m: NewMap[T, struct{}](hasher),
+	return Set[T]{
+		m: NewMap[T, struct{}](hasher).setManySameValue(struct{}{}, values...),
 	}
-	for _, value := range values {
-		s.m.set(value, struct{}{}, true)
-	}
-	return s
 }
 
 // Set returns a set containing the new value.
 //
 // This function will return a new set even if the set already contains the value.
 func (s Set[T]) Set(values ...T) Set[T] {
-	n := Set[T]{
-		m: s.m.clone(),
+	return Set[T]{
+		m: s.m.setManySameValue(struct{}{}, values...),
 	}
-	for _, value := range values {
-		n.m.set(value, struct{}{}, true)
-	}
-	return n
 }
 
 // Delete returns a set with the given key removed.
@@ -41,8 +33,13 @@ func (s Set[T]) Delete(values ...T) Set[T] {
 	n := Set[T]{
 		m: s.m.clone(),
 	}
-	for _, value := range values {
-		n.m.delete(value, true)
+	mutable := true
+	for i, value := range values {
+		// first should be mutable. after that, reuse same new map
+		n.m = n.m.delete(value, mutable)
+		if i == 0 {
+			mutable = false
+		}
 	}
 	return n
 }
@@ -133,26 +130,18 @@ type SortedSet[T comparable] struct {
 // exist for int, string, and byte slice keys.
 // NewSortedSet can also take some initial values as varargs.
 func NewSortedSet[T comparable](comparer Comparer[T], values ...T) SortedSet[T] {
-	s := SortedSet[T]{
-		m: NewSortedMap[T, struct{}](comparer),
+	return SortedSet[T]{
+		m: NewSortedMap[T, struct{}](comparer).setManySameValue(struct{}{}, values...),
 	}
-	for _, value := range values {
-		s.m.set(value, struct{}{}, true)
-	}
-	return s
 }
 
 // Set returns a set containing the new value.
 //
 // This function will return a new set even if the set already contains the value.
 func (s SortedSet[T]) Set(values ...T) SortedSet[T] {
-	n := SortedSet[T]{
-		m: s.m.clone(),
+	return SortedSet[T]{
+		m: s.m.setManySameValue(struct{}{}, values...),
 	}
-	for _, value := range values {
-		n.m.set(value, struct{}{}, true)
-	}
-	return n
 }
 
 // Delete returns a set with the given key removed.
@@ -160,8 +149,12 @@ func (s SortedSet[T]) Delete(values ...T) SortedSet[T] {
 	n := SortedSet[T]{
 		m: s.m.clone(),
 	}
-	for _, value := range values {
-		n.m.delete(value, true)
+	mutable := true
+	for i, value := range values {
+		n.m = n.m.delete(value, mutable)
+		if i == 0 {
+			mutable = false
+		}
 	}
 	return n
 }

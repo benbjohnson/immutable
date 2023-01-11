@@ -4,9 +4,10 @@ import (
 	"testing"
 )
 
-func TestSetsPut(t *testing.T) {
+func TestSets_Set(t *testing.T) {
 	s := NewSet[string](nil)
 	s2 := s.Set("1").Set("1")
+	s2.Set("2") // ensure this doesn't affect the original set
 	if s.Len() != 0 {
 		t.Fatalf("Unexpected mutation of set")
 	}
@@ -31,7 +32,7 @@ func TestSetsPut(t *testing.T) {
 	}
 }
 
-func TestSetsDelete(t *testing.T) {
+func TestSets_Delete(t *testing.T) {
 	s := NewSet[string](nil)
 	s2 := s.Set("1")
 	s3 := s.Delete("1")
@@ -49,9 +50,10 @@ func TestSetsDelete(t *testing.T) {
 	}
 }
 
-func TestSortedSetsPut(t *testing.T) {
+func TestSortedSets_Set(t *testing.T) {
 	s := NewSortedSet[string](nil)
 	s2 := s.Set("1").Set("1").Set("0")
+	s2.Set("2") // ensure this doesn't affect the original set
 	if s.Len() != 0 {
 		t.Fatalf("Unexpected mutation of set")
 	}
