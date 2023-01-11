@@ -35,7 +35,7 @@ func (s Set[T]) Delete(values ...T) Set[T] {
 	}
 	mutable := true
 	for i, value := range values {
-		// first should be mutable. after that, reuse same new map
+		// first should be mutable. after that, reuse same new Map
 		n.m = n.m.delete(value, mutable)
 		if i == 0 {
 			mutable = false
@@ -50,7 +50,7 @@ func (s Set[T]) Has(val T) bool {
 	return ok
 }
 
-// Len returns the number of elements in the underlying map.
+// Len returns the number of elements in the underlying Map.
 func (s Set[K]) Len() int {
 	return s.m.Len()
 }
@@ -165,7 +165,7 @@ func (s SortedSet[T]) Has(val T) bool {
 	return ok
 }
 
-// Len returns the number of elements in the underlying map.
+// Len returns the number of elements in the underlying Map.
 func (s SortedSet[K]) Len() int {
 	return s.m.Len()
 }
