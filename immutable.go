@@ -757,11 +757,36 @@ func (m *Map[K, V]) Set(key K, value V) *Map[K, V] {
 // This function will return a new map even if the updated value is the same as
 // the existing value because Map does not track value equality.
 func (m *Map[K, V]) SetMany(entries map[K]V) *Map[K, V] {
-	n := m.clone()
-	for k, v := range entries {
-		n.set(k, v, true)
+	// Set a hasher on the first value if one does not already exist.
+	hasher := m.hasher
+	other := m.clone()
+	first := true
+	for key, value := range entries {
+		if first {
+			if hasher == nil {
+				hasher = NewHasher(key)
+			}
+			other.hasher = hasher
+
+			// If the map is empty, initialize with a simple array node.
+			if other.root == nil {
+				other.size = 1
+				other.root = &mapArrayNode[K, V]{entries: []mapEntry[K, V]{{key: key, value: value}}}
+				first = false
+				continue
+			}
+		}
+
+		// Otherwise copy the map and delegate insertion to the root.
+		// Resized will return true if the key does not currently exist.
+		var resized bool
+		other.root = other.root.set(key, value, 0, hasher.Hash(key), hasher, !first, &resized)
+		if resized {
+			other.size++
+		}
+		first = false
 	}
-	return n
+	return other
 }
 
 func (m *Map[K, V]) set(key K, value V, mutable bool) *Map[K, V] {
@@ -1644,11 +1669,39 @@ func (m *SortedMap[K, V]) Set(key K, value V) *SortedMap[K, V] {
 
 // SetMany returns a map with the keys set to the new values.
 func (m *SortedMap[K, V]) SetMany(entries map[K]V) *SortedMap[K, V] {
-	n := m.clone()
-	for k, v := range entries {
-		n.set(k, v, true)
+	other := m.clone()
+	first := true
+	for key, value := range entries {
+		if first {
+			if other.comparer == nil {
+				other.comparer = NewComparer(key)
+			}
+			// If no values are set then initialize with a leaf node.
+			if m.root == nil {
+				other.size = 1
+				other.root = &sortedMapLeafNode[K, V]{entries: []mapEntry[K, V]{{key: key, value: value}}}
+				first = false
+				continue
+			}
+		}
+
+		// Otherwise delegate to root node.
+		// If a split occurs then grow the tree from the root.
+		var resized bool
+		newRoot, splitNode := m.root.set(key, value, other.comparer, !first, &resized)
+		if splitNode != nil {
+			newRoot = newSortedMapBranchNode(newRoot, splitNode)
+		}
+
+		// Update root and size (if resized).
+		other.size = m.size
+		other.root = newRoot
+		if resized {
+			other.size++
+		}
+		first = false
 	}
-	return n
+	return other
 }
 
 func (m *SortedMap[K, V]) set(key K, value V, mutable bool) *SortedMap[K, V] {

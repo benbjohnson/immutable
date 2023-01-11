@@ -959,6 +959,13 @@ func TestMap_Set(t *testing.T) {
 		if v, ok := m.Get(100); !ok || v != "foo" {
 			t.Fatalf("unexpected value: <%v,%v>", v, ok)
 		}
+		n := m.Set(200, "bar")
+		if v, ok := n.Get(200); !ok || v != "bar" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		}
+		if v, ok := m.Get(200); ok {
+			t.Fatalf("unexpected value for m: <%v,%v>", v, ok)
+		}
 	})
 
 	t.Run("Multi", func(t *testing.T) {
@@ -1060,6 +1067,24 @@ func TestMap_Set(t *testing.T) {
 		}
 		if err := m.Validate(); err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+func TestMap_SetMany(t *testing.T) {
+	t.Run("Simple", func(t *testing.T) {
+		m := NewMap[int, string](nil)
+		m = m.SetMany(map[int]string{100: "foo"})
+		if v, ok := m.Get(100); !ok || v != "foo" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		}
+		n := m.SetMany(map[int]string{200: "bar"})
+		if v, ok := n.Get(200); !ok || v != "bar" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		}
+		// check old map is unaffected
+		if v, ok := m.Get(200); ok {
+			t.Fatalf("unexpected value for m: <%v,%v>", v, ok)
 		}
 	})
 }
@@ -1875,6 +1900,24 @@ func TestSortedMap_Set(t *testing.T) {
 		}
 		if err := m.Validate(); err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+func TestSortedMap_SetMany(t *testing.T) {
+	t.Run("Simple", func(t *testing.T) {
+		m := NewSortedMap[int, string](nil)
+		m = m.SetMany(map[int]string{100: "foo"})
+		if v, ok := m.Get(100); !ok || v != "foo" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		}
+		n := m.SetMany(map[int]string{200: "bar"})
+		if v, ok := n.Get(200); !ok || v != "bar" {
+			t.Fatalf("unexpected value: <%v,%v>", v, ok)
+		}
+		// check old map is unaffected
+		if v, ok := m.Get(200); ok {
+			t.Fatalf("unexpected value for m: <%v,%v>", v, ok)
 		}
 	})
 }
