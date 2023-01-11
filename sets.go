@@ -33,13 +33,11 @@ func (s Set[T]) Delete(values ...T) Set[T] {
 	n := Set[T]{
 		m: s.m.clone(),
 	}
-	mutable := true
-	for i, value := range values {
+	mutable := false
+	for _, value := range values {
 		// first should be mutable. after that, reuse same new Map
 		n.m = n.m.delete(value, mutable)
-		if i == 0 {
-			mutable = false
-		}
+		mutable = true
 	}
 	return n
 }
@@ -149,12 +147,10 @@ func (s SortedSet[T]) Delete(values ...T) SortedSet[T] {
 	n := SortedSet[T]{
 		m: s.m.clone(),
 	}
-	mutable := true
-	for i, value := range values {
+	mutable := false
+	for _, value := range values {
 		n.m = n.m.delete(value, mutable)
-		if i == 0 {
-			mutable = false
-		}
+		mutable = true
 	}
 	return n
 }
