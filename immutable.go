@@ -752,17 +752,6 @@ func (m *Map[K, V]) Set(key K, value V) *Map[K, V] {
 	return m.set(key, value, false)
 }
 
-// SetMany returns a map with the keys set to the new values. nil values are allowed.
-//
-// This function will return a new map even if the updated value is the same as
-// the existing value because Map does not track value equality.
-func (m *Map[K, V]) SetMany(entries map[K]V) *Map[K, V] {
-	for k, v := range entries {
-		m = m.Set(k, v)
-	}
-	return m
-}
-
 func (m *Map[K, V]) set(key K, value V, mutable bool) *Map[K, V] {
 	// Set a hasher on the first value if one does not already exist.
 	hasher := m.hasher
@@ -1639,14 +1628,6 @@ func (m *SortedMap[K, V]) Get(key K) (V, bool) {
 // Set returns a copy of the map with the key set to the given value.
 func (m *SortedMap[K, V]) Set(key K, value V) *SortedMap[K, V] {
 	return m.set(key, value, false)
-}
-
-// SetMany returns a map with the keys set to the new values.
-func (m *SortedMap[K, V]) SetMany(entries map[K]V) *SortedMap[K, V] {
-	for k, v := range entries {
-		m = m.Set(k, v)
-	}
-	return m
 }
 
 func (m *SortedMap[K, V]) set(key K, value V, mutable bool) *SortedMap[K, V] {
