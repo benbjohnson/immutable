@@ -2495,6 +2495,7 @@ func RunRandom(t *testing.T, name string, fn func(t *testing.T, rand *rand.Rand)
 	}
 	t.Run(name, func(t *testing.T) {
 		for i := 0; i < *randomN; i++ {
+			i := i
 			t.Run(fmt.Sprintf("%08d", i), func(t *testing.T) {
 				t.Parallel()
 				fn(t, rand.New(rand.NewSource(int64(i))))
