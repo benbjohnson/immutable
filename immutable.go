@@ -117,12 +117,8 @@ func (l *List[T]) set(index int, value T, mutable bool) *List[T] {
 }
 
 // Append returns a new list with value added to the end of the list.
-func (l *List[T]) Append(values ...T) *List[T] {
-	other := l.clone()
-	for _, value := range values {
-		other.append(value, true)
-	}
-	return other
+func (l *List[T]) Append(value T) *List[T] {
+	return l.append(value, false)
 }
 
 func (l *List[T]) append(value T, mutable bool) *List[T] {
@@ -145,12 +141,8 @@ func (l *List[T]) append(value T, mutable bool) *List[T] {
 }
 
 // Prepend returns a new list with value(s) added to the beginning of the list.
-func (l *List[T]) Prepend(values ...T) *List[T] {
-	other := l.clone()
-	for i := len(values) - 1; i >= 0; i-- {
-		other.prepend(values[i], true)
-	}
-	return other
+func (l *List[T]) Prepend(value T) *List[T] {
+	return l.prepend(value, false)
 }
 
 func (l *List[T]) prepend(value T, mutable bool) *List[T] {
