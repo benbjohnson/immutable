@@ -117,12 +117,8 @@ func (l *List[T]) set(index int, value T, mutable bool) *List[T] {
 }
 
 // Append returns a new list with value added to the end of the list.
-func (l *List[T]) Append(values ...T) *List[T] {
-	other := l.clone()
-	for _, value := range values {
-		other.append(value, true)
-	}
-	return other
+func (l *List[T]) Append(value T) *List[T] {
+	return l.append(value, false)
 }
 
 func (l *List[T]) append(value T, mutable bool) *List[T] {
@@ -145,12 +141,8 @@ func (l *List[T]) append(value T, mutable bool) *List[T] {
 }
 
 // Prepend returns a new list with value(s) added to the beginning of the list.
-func (l *List[T]) Prepend(values ...T) *List[T] {
-	other := l.clone()
-	for i := len(values) - 1; i >= 0; i-- {
-		other.prepend(values[i], true)
-	}
-	return other
+func (l *List[T]) Prepend(value T) *List[T] {
+	return l.prepend(value, false)
 }
 
 func (l *List[T]) prepend(value T, mutable bool) *List[T] {
@@ -750,18 +742,6 @@ func (m *Map[K, V]) Get(key K) (value V, ok bool) {
 // the existing value because Map does not track value equality.
 func (m *Map[K, V]) Set(key K, value V) *Map[K, V] {
 	return m.set(key, value, false)
-}
-
-// SetMany returns a map with the keys set to the new values. nil values are allowed.
-//
-// This function will return a new map even if the updated value is the same as
-// the existing value because Map does not track value equality.
-func (m *Map[K, V]) SetMany(entries map[K]V) *Map[K, V] {
-	n := m.clone()
-	for k, v := range entries {
-		n.set(k, v, true)
-	}
-	return n
 }
 
 func (m *Map[K, V]) set(key K, value V, mutable bool) *Map[K, V] {
@@ -1640,15 +1620,6 @@ func (m *SortedMap[K, V]) Get(key K) (V, bool) {
 // Set returns a copy of the map with the key set to the given value.
 func (m *SortedMap[K, V]) Set(key K, value V) *SortedMap[K, V] {
 	return m.set(key, value, false)
-}
-
-// SetMany returns a map with the keys set to the new values.
-func (m *SortedMap[K, V]) SetMany(entries map[K]V) *SortedMap[K, V] {
-	n := m.clone()
-	for k, v := range entries {
-		n.set(k, v, true)
-	}
-	return n
 }
 
 func (m *SortedMap[K, V]) set(key K, value V, mutable bool) *SortedMap[K, V] {

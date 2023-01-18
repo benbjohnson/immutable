@@ -14,37 +14,23 @@ type Set[T comparable] struct {
 // Default hasher implementations only exist for int, string, and byte slice types.
 // NewSet can also take some initial values as varargs.
 func NewSet[T comparable](hasher Hasher[T], values ...T) Set[T] {
-	s := Set[T]{
-		m: NewMap[T, struct{}](hasher),
-	}
+	m := NewMap[T, struct{}](hasher)
 	for _, value := range values {
-		s.m.set(value, struct{}{}, true)
+		m = m.set(value, struct{}{}, true)
 	}
-	return s
+	return Set[T]{m}
 }
 
-// Set returns a set containing the new value.
+// Add returns a set containing the new value.
 //
 // This function will return a new set even if the set already contains the value.
-func (s Set[T]) Set(values ...T) Set[T] {
-	n := Set[T]{
-		m: s.m.clone(),
-	}
-	for _, value := range values {
-		n.m.set(value, struct{}{}, true)
-	}
-	return n
+func (s Set[T]) Add(value T) Set[T] {
+	return Set[T]{s.m.Set(value, struct{}{})}
 }
 
 // Delete returns a set with the given key removed.
-func (s Set[T]) Delete(values ...T) Set[T] {
-	n := Set[T]{
-		m: s.m.clone(),
-	}
-	for _, value := range values {
-		n.m.delete(value, true)
-	}
-	return n
+func (s Set[T]) Delete(value T) Set[T] {
+	return Set[T]{s.m.Delete(value)}
 }
 
 // Has returns true when the set contains the given value
@@ -133,37 +119,23 @@ type SortedSet[T comparable] struct {
 // exist for int, string, and byte slice keys.
 // NewSortedSet can also take some initial values as varargs.
 func NewSortedSet[T comparable](comparer Comparer[T], values ...T) SortedSet[T] {
-	s := SortedSet[T]{
-		m: NewSortedMap[T, struct{}](comparer),
-	}
+	m := NewSortedMap[T, struct{}](comparer)
 	for _, value := range values {
-		s.m.set(value, struct{}{}, true)
+		m = m.set(value, struct{}{}, true)
 	}
-	return s
+	return SortedSet[T]{m}
 }
 
-// Set returns a set containing the new value.
+// Add returns a set containing the new value.
 //
 // This function will return a new set even if the set already contains the value.
-func (s SortedSet[T]) Set(values ...T) SortedSet[T] {
-	n := SortedSet[T]{
-		m: s.m.clone(),
-	}
-	for _, value := range values {
-		n.m.set(value, struct{}{}, true)
-	}
-	return n
+func (s SortedSet[T]) Add(value T) SortedSet[T] {
+	return SortedSet[T]{s.m.Set(value, struct{}{})}
 }
 
 // Delete returns a set with the given key removed.
-func (s SortedSet[T]) Delete(values ...T) SortedSet[T] {
-	n := SortedSet[T]{
-		m: s.m.clone(),
-	}
-	for _, value := range values {
-		n.m.delete(value, true)
-	}
-	return n
+func (s SortedSet[T]) Delete(value T) SortedSet[T] {
+	return SortedSet[T]{s.m.Delete(value)}
 }
 
 // Has returns true when the set contains the given value

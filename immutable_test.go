@@ -223,6 +223,19 @@ func TestList(t *testing.T) {
 		}
 	})
 
+	t.Run("AppendImmutable", func(t *testing.T) {
+		outer_l := NewList[int]()
+		for N := 0; N < 1_000; N++ {
+			l1 := outer_l.Append(0)
+			outer_l.Append(1)
+			if actual := l1.Get(N); actual != 0 {
+				t.Fatalf("Append mutates list with %d elements. Got %d instead of 0", N, actual)
+			}
+
+			outer_l = outer_l.Append(0)
+		}
+	})
+
 	RunRandom(t, "Random", func(t *testing.T, rand *rand.Rand) {
 		l := NewTList()
 		for i := 0; i < 100000; i++ {
@@ -2482,6 +2495,7 @@ func RunRandom(t *testing.T, name string, fn func(t *testing.T, rand *rand.Rand)
 	}
 	t.Run(name, func(t *testing.T) {
 		for i := 0; i < *randomN; i++ {
+			i := i
 			t.Run(fmt.Sprintf("%08d", i), func(t *testing.T) {
 				t.Parallel()
 				fn(t, rand.New(rand.NewSource(int64(i))))
