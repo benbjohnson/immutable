@@ -684,7 +684,7 @@ const (
 // to generate hashes and check for equality of key values.
 //
 // It is implemented as an Hash Array Mapped Trie.
-type Map[K comparable, V any] struct {
+type Map[K, V any] struct {
 	size   int           // total number of key/value pairs
 	root   mapNode[K, V] // root node of trie
 	hasher Hasher[K]     // hasher implementation
@@ -693,7 +693,7 @@ type Map[K comparable, V any] struct {
 // NewMap returns a new instance of Map. If hasher is nil, a default hasher
 // implementation will automatically be chosen based on the first key added.
 // Default hasher implementations only exist for int, string, and byte slice types.
-func NewMap[K comparable, V any](hasher Hasher[K]) *Map[K, V] {
+func NewMap[K, V any](hasher Hasher[K]) *Map[K, V] {
 	return &Map[K, V]{
 		hasher: hasher,
 	}
@@ -814,12 +814,12 @@ func (m *Map[K, V]) Iterator() *MapIterator[K, V] {
 }
 
 // MapBuilder represents an efficient builder for creating Maps.
-type MapBuilder[K comparable, V any] struct {
+type MapBuilder[K, V any] struct {
 	m *Map[K, V] // current state
 }
 
 // NewMapBuilder returns a new instance of MapBuilder.
-func NewMapBuilder[K comparable, V any](hasher Hasher[K]) *MapBuilder[K, V] {
+func NewMapBuilder[K, V any](hasher Hasher[K]) *MapBuilder[K, V] {
 	return &MapBuilder[K, V]{m: NewMap[K, V](hasher)}
 }
 
@@ -863,7 +863,7 @@ func (b *MapBuilder[K, V]) Iterator() *MapIterator[K, V] {
 }
 
 // mapNode represents any node in the map tree.
-type mapNode[K comparable, V any] interface {
+type mapNode[K, V any] interface {
 	get(key K, shift uint, keyHash uint32, h Hasher[K]) (value V, ok bool)
 	set(key K, value V, shift uint, keyHash uint32, h Hasher[K], mutable bool, resized *bool) mapNode[K, V]
 	delete(key K, shift uint, keyHash uint32, h Hasher[K], mutable bool, resized *bool) mapNode[K, V]
@@ -876,7 +876,7 @@ var _ mapNode[string, any] = (*mapValueNode[string, any])(nil)
 var _ mapNode[string, any] = (*mapHashCollisionNode[string, any])(nil)
 
 // mapLeafNode represents a node that stores a single key hash at the leaf of the map tree.
-type mapLeafNode[K comparable, V any] interface {
+type mapLeafNode[K, V any] interface {
 	mapNode[K, V]
 	keyHashValue() uint32
 }
@@ -887,7 +887,7 @@ var _ mapLeafNode[string, any] = (*mapHashCollisionNode[string, any])(nil)
 // mapArrayNode is a map node that stores key/value pairs in a slice.
 // Entries are stored in insertion order. An array node expands into a bitmap
 // indexed node once a given threshold size is crossed.
-type mapArrayNode[K comparable, V any] struct {
+type mapArrayNode[K, V any] struct {
 	entries []mapEntry[K, V]
 }
 
@@ -989,7 +989,7 @@ func (n *mapArrayNode[K, V]) delete(key K, shift uint, keyHash uint32, h Hasher[
 // mapBitmapIndexedNode represents a map branch node with a variable number of
 // node slots and indexed using a bitmap. Indexes for the node slots are
 // calculated by counting the number of set bits before the target bit using popcount.
-type mapBitmapIndexedNode[K comparable, V any] struct {
+type mapBitmapIndexedNode[K, V any] struct {
 	bitmap uint32
 	nodes  []mapNode[K, V]
 }
@@ -1028,7 +1028,7 @@ func (n *mapBitmapIndexedNode[K, V]) set(key K, value V, shift uint, keyHash uin
 	if exists {
 		newNode = n.nodes[idx].set(key, value, shift+mapNodeBits, keyHash, h, mutable, resized)
 	} else {
-		newNode = newMapValueNode[K, V](keyHash, key, value)
+		newNode = newMapValueNode(keyHash, key, value)
 	}
 
 	// Convert to a hash-array node once we exceed the max bitmap size.
@@ -1135,7 +1135,7 @@ func (n *mapBitmapIndexedNode[K, V]) delete(key K, shift uint, keyHash uint32, h
 
 // mapHashArrayNode is a map branch node that stores nodes in a fixed length
 // array. Child nodes are indexed by their index bit segment for the current depth.
-type mapHashArrayNode[K comparable, V any] struct {
+type mapHashArrayNode[K, V any] struct {
 	count uint                       // number of set nodes
 	nodes [mapNodeSize]mapNode[K, V] // child node slots, may contain empties
 }
@@ -1231,14 +1231,14 @@ func (n *mapHashArrayNode[K, V]) delete(key K, shift uint, keyHash uint32, h Has
 // mapValueNode represents a leaf node with a single key/value pair.
 // A value node can be converted to a hash collision leaf node if a different
 // key with the same keyHash is inserted.
-type mapValueNode[K comparable, V any] struct {
+type mapValueNode[K, V any] struct {
 	keyHash uint32
 	key     K
 	value   V
 }
 
 // newMapValueNode returns a new instance of mapValueNode.
-func newMapValueNode[K comparable, V any](keyHash uint32, key K, value V) *mapValueNode[K, V] {
+func newMapValueNode[K, V any](keyHash uint32, key K, value V) *mapValueNode[K, V] {
 	return &mapValueNode[K, V]{
 		keyHash: keyHash,
 		key:     key,
@@ -1303,7 +1303,7 @@ func (n *mapValueNode[K, V]) delete(key K, shift uint, keyHash uint32, h Hasher[
 
 // mapHashCollisionNode represents a leaf node that contains two or more key/value
 // pairs with the same key hash. Single pairs for a hash are stored as value nodes.
-type mapHashCollisionNode[K comparable, V any] struct {
+type mapHashCollisionNode[K, V any] struct {
 	keyHash uint32 // key hash for all entries
 	entries []mapEntry[K, V]
 }
@@ -1409,7 +1409,7 @@ func (n *mapHashCollisionNode[K, V]) delete(key K, shift uint, keyHash uint32, h
 
 // mergeIntoNode merges a key/value pair into an existing node.
 // Caller must verify that node's keyHash is not equal to keyHash.
-func mergeIntoNode[K comparable, V any](node mapLeafNode[K, V], shift uint, keyHash uint32, key K, value V) mapNode[K, V] {
+func mergeIntoNode[K, V any](node mapLeafNode[K, V], shift uint, keyHash uint32, key K, value V) mapNode[K, V] {
 	idx1 := (node.keyHashValue() >> shift) & mapNodeMask
 	idx2 := (keyHash >> shift) & mapNodeMask
 
@@ -1428,14 +1428,14 @@ func mergeIntoNode[K comparable, V any](node mapLeafNode[K, V], shift uint, keyH
 }
 
 // mapEntry represents a single key/value pair.
-type mapEntry[K comparable, V any] struct {
+type mapEntry[K, V any] struct {
 	key   K
 	value V
 }
 
 // MapIterator represents an iterator over a map's key/value pairs. Although
 // map keys are not sorted, the iterator's order is deterministic.
-type MapIterator[K comparable, V any] struct {
+type MapIterator[K, V any] struct {
 	m *Map[K, V] // source map
 
 	stack [32]mapIteratorElem[K, V] // search stack
@@ -1559,7 +1559,7 @@ func (itr *MapIterator[K, V]) first() {
 }
 
 // mapIteratorElem represents a node/index pair in the MapIterator stack.
-type mapIteratorElem[K comparable, V any] struct {
+type mapIteratorElem[K, V any] struct {
 	node  mapNode[K, V]
 	index int
 }
@@ -1573,7 +1573,7 @@ const (
 // is determined by the Comparer used by the map.
 //
 // This map is implemented as a B+tree.
-type SortedMap[K comparable, V any] struct {
+type SortedMap[K, V any] struct {
 	size     int                 // total number of key/value pairs
 	root     sortedMapNode[K, V] // root of b+tree
 	comparer Comparer[K]
@@ -1582,7 +1582,7 @@ type SortedMap[K comparable, V any] struct {
 // NewSortedMap returns a new instance of SortedMap. If comparer is nil then
 // a default comparer is set after the first key is inserted. Default comparers
 // exist for int, string, and byte slice keys.
-func NewSortedMap[K comparable, V any](comparer Comparer[K]) *SortedMap[K, V] {
+func NewSortedMap[K, V any](comparer Comparer[K]) *SortedMap[K, V] {
 	return &SortedMap[K, V]{
 		comparer: comparer,
 	}
@@ -1705,12 +1705,12 @@ func (m *SortedMap[K, V]) Iterator() *SortedMapIterator[K, V] {
 }
 
 // SortedMapBuilder represents an efficient builder for creating sorted maps.
-type SortedMapBuilder[K comparable, V any] struct {
+type SortedMapBuilder[K, V any] struct {
 	m *SortedMap[K, V] // current state
 }
 
 // NewSortedMapBuilder returns a new instance of SortedMapBuilder.
-func NewSortedMapBuilder[K comparable, V any](comparer Comparer[K]) *SortedMapBuilder[K, V] {
+func NewSortedMapBuilder[K, V any](comparer Comparer[K]) *SortedMapBuilder[K, V] {
 	return &SortedMapBuilder[K, V]{m: NewSortedMap[K, V](comparer)}
 }
 
@@ -1754,7 +1754,7 @@ func (b *SortedMapBuilder[K, V]) Iterator() *SortedMapIterator[K, V] {
 }
 
 // sortedMapNode represents a branch or leaf node in the sorted map.
-type sortedMapNode[K comparable, V any] interface {
+type sortedMapNode[K, V any] interface {
 	minKey() K
 	indexOf(key K, c Comparer[K]) int
 	get(key K, c Comparer[K]) (value V, ok bool)
@@ -1766,12 +1766,12 @@ var _ sortedMapNode[string, any] = (*sortedMapBranchNode[string, any])(nil)
 var _ sortedMapNode[string, any] = (*sortedMapLeafNode[string, any])(nil)
 
 // sortedMapBranchNode represents a branch in the sorted map.
-type sortedMapBranchNode[K comparable, V any] struct {
+type sortedMapBranchNode[K, V any] struct {
 	elems []sortedMapBranchElem[K, V]
 }
 
 // newSortedMapBranchNode returns a new branch node with the given child nodes.
-func newSortedMapBranchNode[K comparable, V any](children ...sortedMapNode[K, V]) *sortedMapBranchNode[K, V] {
+func newSortedMapBranchNode[K, V any](children ...sortedMapNode[K, V]) *sortedMapBranchNode[K, V] {
 	// Fetch min keys for every child.
 	elems := make([]sortedMapBranchElem[K, V], len(children))
 	for i, child := range children {
@@ -1914,13 +1914,13 @@ func (n *sortedMapBranchNode[K, V]) delete(key K, c Comparer[K], mutable bool, r
 	return other
 }
 
-type sortedMapBranchElem[K comparable, V any] struct {
+type sortedMapBranchElem[K, V any] struct {
 	key  K
 	node sortedMapNode[K, V]
 }
 
 // sortedMapLeafNode represents a leaf node in the sorted map.
-type sortedMapLeafNode[K comparable, V any] struct {
+type sortedMapLeafNode[K, V any] struct {
 	entries []mapEntry[K, V]
 }
 
@@ -2035,7 +2035,7 @@ func (n *sortedMapLeafNode[K, V]) delete(key K, c Comparer[K], mutable bool, res
 
 // SortedMapIterator represents an iterator over a sorted map.
 // Iteration can occur in natural or reverse order based on use of Next() or Prev().
-type SortedMapIterator[K comparable, V any] struct {
+type SortedMapIterator[K, V any] struct {
 	m *SortedMap[K, V] // source map
 
 	stack [32]sortedMapIteratorElem[K, V] // search stack
@@ -2223,13 +2223,13 @@ func (itr *SortedMapIterator[K, V]) seek(key K) {
 }
 
 // sortedMapIteratorElem represents node/index pair in the SortedMapIterator stack.
-type sortedMapIteratorElem[K comparable, V any] struct {
+type sortedMapIteratorElem[K, V any] struct {
 	node  sortedMapNode[K, V]
 	index int
 }
 
 // Hasher hashes keys and checks them for equality.
-type Hasher[K comparable] interface {
+type Hasher[K any] interface {
 	// Computes a hash for key.
 	Hash(key K) uint32
 
@@ -2238,7 +2238,7 @@ type Hasher[K comparable] interface {
 }
 
 // NewHasher returns the built-in hasher for a given key type.
-func NewHasher[K comparable](key K) Hasher[K] {
+func NewHasher[K any](key K) Hasher[K] {
 	// Attempt to use non-reflection based hasher first.
 	switch (any(key)).(type) {
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, uintptr, string:
@@ -2267,7 +2267,7 @@ func hashString(value string) uint32 {
 }
 
 // reflectIntHasher implements a reflection-based Hasher for keys.
-type reflectHasher[K comparable] struct{}
+type reflectHasher[K any] struct{}
 
 // Hash returns a hash for key.
 func (h *reflectHasher[K]) Hash(key K) uint32 {
@@ -2313,11 +2313,10 @@ func hashUint64(value uint64) uint32 {
 }
 
 // defaultHasher implements Hasher.
-type defaultHasher[K comparable] struct{}
+type defaultHasher[K any] struct{}
 
 // Hash returns a hash for key.
 func (h *defaultHasher[K]) Hash(key K) uint32 {
-	// Attempt to use non-reflection based hasher first.
 	switch x := (any(key)).(type) {
 	case int:
 		return hashUint64(uint64(x))
@@ -2348,13 +2347,13 @@ func (h *defaultHasher[K]) Hash(key K) uint32 {
 }
 
 // Equal returns true if a is equal to b. Otherwise returns false.
-// Panics if a and b are not ints.
+// Panics if a and b are not comparable.
 func (h *defaultHasher[K]) Equal(a, b K) bool {
-	return a == b
+	return any(a) == any(b)
 }
 
 // Comparer allows the comparison of two keys for the purpose of sorting.
-type Comparer[K comparable] interface {
+type Comparer[K any] interface {
 	// Returns -1 if a is less than b, returns 1 if a is greater than b,
 	// and returns 0 if a is equal to b.
 	Compare(a, b K) int
@@ -2363,7 +2362,7 @@ type Comparer[K comparable] interface {
 // NewComparer returns the built-in comparer for a given key type.
 // Note that only int-ish and string-ish types are supported, despite the 'comparable' constraint.
 // Attempts to use other types will result in a panic - users should define their own Comparers for these cases.
-func NewComparer[K comparable](key K) Comparer[K] {
+func NewComparer[K any](key K) Comparer[K] {
 	// Attempt to use non-reflection based comparer first.
 	switch (any(key)).(type) {
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, uintptr, string:
@@ -2380,8 +2379,8 @@ func NewComparer[K comparable](key K) Comparer[K] {
 	panic(fmt.Sprintf("immutable.NewComparer: must set comparer for %T type", key))
 }
 
-// defaultComparer compares two values (int-ish and string-ish types are supported. Implements Comparer.
-type defaultComparer[K comparable] struct{}
+// defaultComparer compares two values (int-ish and string-ish types are supported). Implements Comparer.
+type defaultComparer[K any] struct{}
 
 // Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
 // returns 0 if a is equal to b. Panic if a or b is not a string or int* type
@@ -2427,7 +2426,7 @@ func defaultCompare[K constraints.Ordered](i, j K) int {
 }
 
 // reflectIntComparer compares two values using reflection. Implements Comparer.
-type reflectComparer[K comparable] struct{}
+type reflectComparer[K any] struct{}
 
 // Compare returns -1 if a is less than b, returns 1 if a is greater than b, and
 // returns 0 if a is equal to b. Panic if a or b is not an int-ish or string-ish type.

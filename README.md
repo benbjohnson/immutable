@@ -241,7 +241,7 @@ Hashers are fairly simple. They only need to generate hashes for a given key
 and check equality given two keys.
 
 ```go
-type Hasher[K comparable] interface {
+type Hasher[K any] interface {
 	Hash(key K) uint32
 	Equal(a, b K) bool
 }
@@ -277,7 +277,7 @@ Comparers on have one method—`Compare()`. It works the same as the
 `1` if a is greater than `b`, and returns `0` if `a` is equal to `b`.
 
 ```go
-type Comparer[K comparable] interface {
+type Comparer[K any] interface {
 	Compare(a, b K) int
 }
 ```

@@ -4,7 +4,7 @@ package immutable
 // to generate hashes and check for equality of key values.
 //
 // Internally, the Set stores values as keys of a Map[T,struct{}]
-type Set[T comparable] struct {
+type Set[T any] struct {
 	m *Map[T, struct{}]
 }
 
@@ -13,7 +13,7 @@ type Set[T comparable] struct {
 // If hasher is nil, a default hasher implementation will automatically be chosen based on the first key added.
 // Default hasher implementations only exist for int, string, and byte slice types.
 // NewSet can also take some initial values as varargs.
-func NewSet[T comparable](hasher Hasher[T], values ...T) Set[T] {
+func NewSet[T any](hasher Hasher[T], values ...T) Set[T] {
 	m := NewMap[T, struct{}](hasher)
 	for _, value := range values {
 		m = m.set(value, struct{}{}, true)
@@ -64,7 +64,7 @@ func (s Set[T]) Iterator() *SetIterator[T] {
 
 // SetIterator represents an iterator over a set.
 // Iteration can occur in natural or reverse order based on use of Next() or Prev().
-type SetIterator[T comparable] struct {
+type SetIterator[T any] struct {
 	mi *MapIterator[T, struct{}]
 }
 
@@ -84,11 +84,11 @@ func (itr *SetIterator[T]) Next() (val T, ok bool) {
 	return
 }
 
-type SetBuilder[T comparable] struct {
+type SetBuilder[T any] struct {
 	s Set[T]
 }
 
-func NewSetBuilder[T comparable](hasher Hasher[T]) *SetBuilder[T] {
+func NewSetBuilder[T any](hasher Hasher[T]) *SetBuilder[T] {
 	return &SetBuilder[T]{s: NewSet(hasher)}
 }
 
@@ -108,7 +108,7 @@ func (s SetBuilder[T]) Len() int {
 	return s.s.Len()
 }
 
-type SortedSet[T comparable] struct {
+type SortedSet[T any] struct {
 	m *SortedMap[T, struct{}]
 }
 
@@ -118,7 +118,7 @@ type SortedSet[T comparable] struct {
 // a default comparer is set after the first key is inserted. Default comparers
 // exist for int, string, and byte slice keys.
 // NewSortedSet can also take some initial values as varargs.
-func NewSortedSet[T comparable](comparer Comparer[T], values ...T) SortedSet[T] {
+func NewSortedSet[T any](comparer Comparer[T], values ...T) SortedSet[T] {
 	m := NewSortedMap[T, struct{}](comparer)
 	for _, value := range values {
 		m = m.set(value, struct{}{}, true)
@@ -169,7 +169,7 @@ func (s SortedSet[T]) Iterator() *SortedSetIterator[T] {
 
 // SortedSetIterator represents an iterator over a sorted set.
 // Iteration can occur in natural or reverse order based on use of Next() or Prev().
-type SortedSetIterator[T comparable] struct {
+type SortedSetIterator[T any] struct {
 	mi *SortedMapIterator[T, struct{}]
 }
 
@@ -208,11 +208,11 @@ func (itr *SortedSetIterator[T]) Seek(val T) {
 	itr.mi.Seek(val)
 }
 
-type SortedSetBuilder[T comparable] struct {
+type SortedSetBuilder[T any] struct {
 	s SortedSet[T]
 }
 
-func NewSortedSetBuilder[T comparable](comparer Comparer[T]) *SortedSetBuilder[T] {
+func NewSortedSetBuilder[T any](comparer Comparer[T]) *SortedSetBuilder[T] {
 	return &SortedSetBuilder[T]{s: NewSortedSet(comparer)}
 }
 
