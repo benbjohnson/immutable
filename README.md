@@ -291,7 +291,7 @@ wrapper around a `Map[T, struct{}]`.
 
 Like Maps, Sets require a `Hasher` to hash keys and check for equality. There are built-in
 hasher implementations for most primitive types such as `int`, `uint`, and
-`string` keys. You may pass in a `nil` hasher to `NewMap()` if you are using
+`string` keys. You may pass in a `nil` hasher to `NewSet()` if you are using
 one of these key types.
 
 
