@@ -101,3 +101,26 @@ func TestSortedSetsDelete(t *testing.T) {
 		t.Fatalf("Unexpected set element after delete")
 	}
 }
+
+func TestSortedSetBuilder(t *testing.T) {
+	b := NewSortedSetBuilder[string](nil)
+	b.Set("test3")
+	b.Set("test1")
+	b.Set("test2")
+
+	s := b.SortedSet()
+	items := s.Items()
+
+	if len(items) != 3 {
+		t.Fatalf("Set has wrong number of items")
+	}
+	if items[0] != "test1" {
+		t.Fatalf("First item incorrectly sorted")
+	}
+	if items[1] != "test2" {
+		t.Fatalf("Second item incorrectly sorted")
+	}
+	if items[2] != "test3" {
+		t.Fatalf("Third item incorrectly sorted")
+	}
+}
