@@ -194,13 +194,13 @@ func (itr *SortedSetIterator[T]) Next() (val T, ok bool) {
 	return
 }
 
-// Next moves the iterator to the previous value.
+// Prev moves the iterator to the previous value.
 func (itr *SortedSetIterator[T]) Prev() (val T, ok bool) {
 	val, _, ok = itr.mi.Prev()
 	return
 }
 
-// Next moves the iterator to the given value.
+// Seek moves the iterator to the given value.
 //
 // If the value does not exist then the next value is used. If no more keys exist
 // then the iterator is marked as done.
@@ -209,11 +209,12 @@ func (itr *SortedSetIterator[T]) Seek(val T) {
 }
 
 type SortedSetBuilder[T any] struct {
-	s SortedSet[T]
+	s *SortedSet[T]
 }
 
 func NewSortedSetBuilder[T any](comparer Comparer[T]) *SortedSetBuilder[T] {
-	return &SortedSetBuilder[T]{s: NewSortedSet(comparer)}
+	s := NewSortedSet(comparer)
+	return &SortedSetBuilder[T]{s: &s}
 }
 
 func (s SortedSetBuilder[T]) Set(val T) {
@@ -230,4 +231,13 @@ func (s SortedSetBuilder[T]) Has(val T) bool {
 
 func (s SortedSetBuilder[T]) Len() int {
 	return s.s.Len()
+}
+
+// SortedSet returns the current copy of the set.
+// The builder should not be used again after the list after this call.
+func (s SortedSetBuilder[T]) SortedSet() SortedSet[T] {
+	assert(s.s != nil, "immutable.SortedSetBuilder.SortedSet(): duplicate call to fetch sorted set")
+	set := s.s
+	s.s = nil
+	return *set
 }
